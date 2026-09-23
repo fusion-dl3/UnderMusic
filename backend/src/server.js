@@ -1,7 +1,10 @@
+require('dotenv').config();
+
 const express = require('express');
+const { connectDatabase } = require('./config/database');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
@@ -11,6 +14,17 @@ app.get('/', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor de UnderMusic ejecutandose en http://localhost:${PORT}`);
-});
+async function startServer() {
+  try {
+    await connectDatabase();
+
+    app.listen(PORT, () => {
+      console.log(`Servidor de UnderMusic ejecutandose en http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error('Error al iniciar UnderMusic:', error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
