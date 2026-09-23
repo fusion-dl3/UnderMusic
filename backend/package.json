@@ -1,0 +1,15 @@
+{
+  "name": "undermusic-backend",
+  "version": "1.0.0",
+  "description": "API REST para la aplicacion UnderMusic",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
