@@ -1,7 +1,10 @@
 require('dotenv').config();
 
 const express = require('express');
+
 const { connectDatabase } = require('./config/database');
+const { crearIndicesUsuarios } = require('./models/usuarioModel');
+const usuarioRoutes = require('./routes/usuarioRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,9 +17,12 @@ app.get('/', (req, res) => {
   });
 });
 
+app.use('/api/usuarios', usuarioRoutes);
+
 async function startServer() {
   try {
     await connectDatabase();
+    await crearIndicesUsuarios();
 
     app.listen(PORT, () => {
       console.log(`Servidor de UnderMusic ejecutandose en http://localhost:${PORT}`);
