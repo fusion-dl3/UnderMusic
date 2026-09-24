@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { ObjectId } = require('mongodb');
 
 const { getUsuariosCollection } = require('../models/usuarioModel');
 
@@ -219,8 +220,44 @@ async function iniciarSesion(req, res) {
     });
   }
 }
+async function obtenerUsuarioActual(req, res) {
+  try {
+    const usuarios = getUsuariosCollection();
+
+    const usuario = await usuarios.findOne({
+      _id: new ObjectId(req.usuario.id)
+    });
+
+    if (!usuario) {
+      return res.status(404).json({
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    return res.status(200).json({
+      usuario: {
+        id: usuario._id,
+        nombreUsuario: usuario.nombreUsuario,
+        correoCuenta: usuario.correoCuenta,
+        rol: usuario.rol,
+        fotoPerfil: usuario.fotoPerfil,
+        ubicacion: usuario.ubicacion,
+        generosFavoritos: usuario.generosFavoritos,
+        priorizarComuna: usuario.priorizarComuna,
+        fechaCreacion: usuario.fechaCreacion
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener usuario actual:', error);
+
+    return res.status(500).json({
+      message: 'Error interno del servidor'
+    });
+  }
+}
 
 module.exports = {
   registrarUsuario,
-  iniciarSesion
+  iniciarSesion,
+  obtenerUsuarioActual
 };
