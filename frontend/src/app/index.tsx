@@ -1,98 +1,289 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useRef } from 'react';
+import {
+  Animated,
+  Image,
+  ImageBackground,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
-
 export default function HomeScreen() {
+  const buttonScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(buttonScale, {
+          toValue: 0.985,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonScale, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [buttonScale]);
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Bienvenido a UnderMusic
-          </ThemedText>
-        </ThemedView>
+    <View style={styles.container}>
+      <ImageBackground
+        source={require('../../assets/images/inicio-fondo.png')}
+        style={styles.background}
+        resizeMode="cover"
+      >
+        <View style={styles.darkOverlay} />
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../../assets/images/undermusic-logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+          <View style={styles.spacer} />
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+          <View style={styles.actionsContainer}>
+            <Animated.View
+              style={[
+                styles.buttonWrapper,
+                {
+                  transform: [{ scale: buttonScale }],
+                },
+              ]}
+            >
+              <Pressable
+                style={({ pressed }) => [
+                  styles.pressable,
+                  pressed && styles.buttonPressed,
+                ]}
+              >
+                <LinearGradient
+                  colors={['#168CFF', '#7047FF', '#E02BFF']}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.loginButton}
+                >
+                  <View style={styles.buttonContent}>
+                    <View style={styles.iconSlot}>
+                      <Image
+                        source={require('../../assets/images/icono-login.png')}
+                        style={styles.loginIcon}
+                        resizeMode="contain"
+                      />
+                    </View>
+
+                    <Text style={styles.buttonText}>
+                      Iniciar sesión
+                    </Text>
+                  </View>
+                </LinearGradient>
+              </Pressable>
+            </Animated.View>
+
+            <Animated.View
+              style={[
+                styles.buttonWrapper,
+                {
+                  transform: [{ scale: buttonScale }],
+                },
+              ]}
+            >
+              <Pressable
+                style={({ pressed }) => [
+                  styles.registerButton,
+                  pressed && styles.buttonPressed,
+                ]}
+              >
+                <View style={styles.buttonContent}>
+                  <View style={styles.iconSlot}>
+                    <Image
+                      source={require('../../assets/images/icono-registro.png')}
+                      style={styles.registerIcon}
+                      resizeMode="contain"
+                    />
+                  </View>
+
+                  <Text style={[styles.buttonText, styles.registerText]}>
+                    Registrarse
+                  </Text>
+                </View>
+              </Pressable>
+            </Animated.View>
+
+            <View style={styles.messageContainer}>
+              <Image
+                source={require('../../assets/images/icono-musica.png')}
+                style={styles.musicIcon}
+                resizeMode="contain"
+              />
+
+              <Text style={styles.messageText}>
+                La música está esperando.{'\n'}
+                <Text style={styles.messageHighlight}>
+                  Descubre a los próximos artistas.
+                </Text>
+              </Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: '#020106',
   },
+
+  background: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+
+  darkOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.16)',
+  },
+
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    paddingHorizontal: 28,
+    paddingTop: 4,
+    paddingBottom: 28,
   },
-  heroSection: {
+
+  logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
   },
-  title: {
+
+  logo: {
+    width: '100%',
+    height: 245,
+  },
+
+  spacer: {
+    flex: 1,
+  },
+
+  actionsContainer: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 14,
+  },
+
+  buttonWrapper: {
+    width: '100%',
+    maxWidth: 520,
+    borderRadius: 16,
+  },
+
+  pressable: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+
+  loginButton: {
+    minHeight: 62,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+
+  registerButton: {
+    width: '100%',
+    minHeight: 62,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#477BFF',
+    backgroundColor: 'rgba(4, 3, 12, 0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+
+  buttonContent: {
+  width: 230,
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginLeft: 18,
+},
+
+  iconSlot: {
+  width: 44,
+  height: 30,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 8,
+},
+
+  loginIcon: {
+    width: 27,
+    height: 27,
+  },
+
+  registerIcon: {
+    width: 30,
+    height: 30,
+  },
+
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+
+  registerText: {
+  marginLeft: 10,
+},
+
+  buttonPressed: {
+    opacity: 0.82,
+  },
+
+  messageContainer: {
+    marginTop: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+  },
+
+  musicIcon: {
+    width: 35,
+    height: 35,
+  },
+
+  messageText: {
+    color: '#D9D8E3',
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
   },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+
+  messageHighlight: {
+    color: '#A966FF',
+    fontWeight: '600',
   },
 });
