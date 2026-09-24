@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const { getUsuariosCollection } = require('../models/usuarioModel');
 
@@ -60,11 +61,13 @@ async function registrarUsuario(req, res) {
         message: 'El rol debe ser oyente o artista'
       });
     }
+
     if (typeof priorizarComuna !== 'boolean') {
-     return res.status(400).json({
+      return res.status(400).json({
         message: 'Debes indicar si deseas priorizar artistas de tu comuna'
-    });
+      });
     }
+
     if (password.length < 6) {
       return res.status(400).json({
         message: 'La contraseña debe tener al menos 6 caracteres'
@@ -144,6 +147,80 @@ async function registrarUsuario(req, res) {
   }
 }
 
+async function iniciarSesion(req, res) {
+  try {
+    const {
+      correoCuenta,
+      password
+    } = req.body;
+
+    if (!correoCuenta || !password) {
+      return res.status(400).json({
+        message: 'Correo y contraseña son obligatorios'
+      });
+    }
+
+    const correoNormalizado =
+      normalizarCorreo(correoCuenta);
+
+    const usuarios = getUsuariosCollection();
+
+    const usuario = await usuarios.findOne({
+      correoCuenta: correoNormalizado
+    });
+
+    if (!usuario) {
+      return res.status(401).json({
+        message: 'Correo o contraseña incorrectos'
+      });
+    }
+
+    const passwordCorrecta = await bcrypt.compare(
+      password,
+      usuario.passwordHash
+    );
+
+    if (!passwordCorrecta) {
+      return res.status(401).json({
+        message: 'Correo o contraseña incorrectos'
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        id: usuario._id.toString(),
+        rol: usuario.rol
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: '30d'
+      }
+    );
+
+    return res.status(200).json({
+      message: 'Inicio de sesion correcto',
+      token,
+      usuario: {
+        id: usuario._id,
+        nombreUsuario: usuario.nombreUsuario,
+        correoCuenta: usuario.correoCuenta,
+        rol: usuario.rol,
+        fotoPerfil: usuario.fotoPerfil,
+        ubicacion: usuario.ubicacion,
+        generosFavoritos: usuario.generosFavoritos,
+        priorizarComuna: usuario.priorizarComuna
+      }
+    });
+  } catch (error) {
+    console.error('Error al iniciar sesion:', error);
+
+    return res.status(500).json({
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 module.exports = {
-  registrarUsuario
+  registrarUsuario,
+  iniciarSesion
 };
