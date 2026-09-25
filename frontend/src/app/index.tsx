@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import {
   Animated,
@@ -67,6 +68,7 @@ export default function HomeScreen() {
               ]}
             >
               <Pressable
+                onPress={() => router.push('/login')}
                 style={({ pressed }) => [
                   styles.pressable,
                   pressed && styles.buttonPressed,
