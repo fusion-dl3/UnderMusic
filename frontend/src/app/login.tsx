@@ -73,6 +73,7 @@ export default function LoginScreen() {
       console.log('Sesión guardada correctamente');
 
       setMensajeExito('Inicio de sesión correcto.');
+      router.replace('/inicio');
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
 
