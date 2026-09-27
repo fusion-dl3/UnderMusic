@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -59,7 +60,17 @@ export default function LoginScreen() {
         return;
       }
 
+      if (!datos.token) {
+        setMensajeError(
+          'El servidor no entregó una sesión válida.'
+        );
+        return;
+      }
+
+      await SecureStore.setItemAsync('token', datos.token);
+
       console.log('Inicio de sesión correcto');
+      console.log('Sesión guardada correctamente');
 
       setMensajeExito('Inicio de sesión correcto.');
     } catch (error) {
@@ -73,7 +84,7 @@ export default function LoginScreen() {
     }
   };
 
-  useEffect(() => {
+  useEffect(() => { 
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(buttonScale, {
