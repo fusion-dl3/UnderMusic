@@ -21,7 +21,8 @@ async function registrarUsuario(req, res) {
       pais,
       region,
       comuna,
-      priorizarComuna
+      priorizarComuna,
+      generosFavoritos = []
     } = req.body;
 
     if (
@@ -75,6 +76,21 @@ async function registrarUsuario(req, res) {
       });
     }
 
+    if (!Array.isArray(generosFavoritos)) {
+      return res.status(400).json({
+        message: 'Los generos favoritos deben enviarse como una lista'
+      });
+    }
+
+    const generosNormalizados = [
+      ...new Set(
+        generosFavoritos
+          .filter((genero) => typeof genero === 'string')
+          .map((genero) => genero.trim())
+          .filter((genero) => genero.length > 0)
+      )
+    ];
+
     const usuarios = getUsuariosCollection();
 
     const usuarioExistente = await usuarios.findOne({
@@ -116,7 +132,7 @@ async function registrarUsuario(req, res) {
         comuna: comuna.trim()
       },
 
-      generosFavoritos: [],
+      generosFavoritos: generosNormalizados,
       priorizarComuna,
 
       fechaCreacion: fechaActual,
@@ -125,8 +141,20 @@ async function registrarUsuario(req, res) {
 
     const resultado = await usuarios.insertOne(nuevoUsuario);
 
+    const token = jwt.sign(
+      {
+        id: resultado.insertedId.toString(),
+        rol: nuevoUsuario.rol
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: '30d'
+      }
+    );
+
     return res.status(201).json({
       message: 'Usuario registrado correctamente',
+      token,
       usuario: {
         id: resultado.insertedId,
         nombreUsuario: nuevoUsuario.nombreUsuario,
@@ -140,6 +168,12 @@ async function registrarUsuario(req, res) {
       }
     });
   } catch (error) {
+    if (error && error.code === 11000) {
+      return res.status(409).json({
+        message: 'El nombre de usuario o correo electronico ya esta registrado'
+      });
+    }
+
     console.error('Error al registrar usuario:', error);
 
     return res.status(500).json({
@@ -220,6 +254,7 @@ async function iniciarSesion(req, res) {
     });
   }
 }
+
 async function obtenerUsuarioActual(req, res) {
   try {
     const usuarios = getUsuariosCollection();

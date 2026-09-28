@@ -106,6 +106,7 @@ export default function HomeScreen() {
               ]}
             >
               <Pressable
+                onPress={() => router.push('/registro')}
                 style={({ pressed }) => [
                   styles.registerButton,
                   pressed && styles.buttonPressed,

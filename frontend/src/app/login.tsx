@@ -272,12 +272,13 @@ export default function LoginScreen() {
               </View>
 
               <Pressable
-                disabled={iniciandoSesion}
-                style={({ pressed }) => [
-                  styles.createAccountButton,
-                  pressed && styles.buttonPressed,
-                ]}
-              >
+  onPress={() => router.push('/registro')}
+  disabled={iniciandoSesion}
+  style={({ pressed }) => [
+    styles.createAccountButton,
+    pressed && styles.buttonPressed,
+  ]}
+>
                 <Image
                   source={require('../../assets/images/icono-registro.png')}
                   style={styles.registerIcon}
