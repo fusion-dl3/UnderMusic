@@ -148,13 +148,13 @@ export default function InicioScreen() {
     const cicloCompleto = Animated.loop(
       Animated.sequence([
         animarEqualizador(animacionesEqualizadores[0]),
-        Animated.delay(2000),
+        Animated.delay(1000),
 
         animarEqualizador(animacionesEqualizadores[1]),
-        Animated.delay(2000),
+        Animated.delay(1000),
 
         animarEqualizador(animacionesEqualizadores[2]),
-        Animated.delay(2000),
+        Animated.delay(1000),
       ])
     );
 

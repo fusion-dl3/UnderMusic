@@ -3,7 +3,9 @@ const jwt = require('jsonwebtoken');
 const { ObjectId } = require('mongodb');
 
 const { getUsuariosCollection } = require('../models/usuarioModel');
-
+const {
+  GENEROS_MUSICALES
+} = require('../constants/generos');
 const {
   normalizarNombreUsuario,
   normalizarCorreo,
@@ -290,9 +292,78 @@ async function obtenerUsuarioActual(req, res) {
     });
   }
 }
+async function actualizarPreferenciasMusicales(req, res) {
+  try {
+    const {
+      generosFavoritos
+    } = req.body;
 
+    if (!Array.isArray(generosFavoritos)) {
+      return res.status(400).json({
+        message: 'Los generos favoritos deben enviarse como una lista'
+      });
+    }
+
+    const generosNormalizados = [
+      ...new Set(
+        generosFavoritos
+          .filter((genero) => typeof genero === 'string')
+          .map((genero) => genero.trim())
+          .filter((genero) => genero.length > 0)
+      )
+    ];
+
+    const generosInvalidos = generosNormalizados.filter(
+      (genero) => !GENEROS_MUSICALES.includes(genero)
+    );
+
+    if (generosInvalidos.length > 0) {
+      return res.status(400).json({
+        message: 'Uno o mas generos musicales no son validos'
+      });
+    }
+
+    const usuarios = getUsuariosCollection();
+
+    const resultado = await usuarios.findOneAndUpdate(
+      {
+        _id: new ObjectId(req.usuario.id)
+      },
+      {
+        $set: {
+          generosFavoritos: generosNormalizados,
+          fechaActualizacion: new Date()
+        }
+      },
+      {
+        returnDocument: 'after'
+      }
+    );
+
+    if (!resultado) {
+      return res.status(404).json({
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Preferencias musicales actualizadas correctamente',
+      generosFavoritos: resultado.generosFavoritos
+    });
+  } catch (error) {
+    console.error(
+      'Error al actualizar preferencias musicales:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Error interno del servidor'
+    });
+  }
+}
 module.exports = {
   registrarUsuario,
   iniciarSesion,
-  obtenerUsuarioActual
+  obtenerUsuarioActual,
+  actualizarPreferenciasMusicales
 };

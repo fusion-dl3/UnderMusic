@@ -3,7 +3,8 @@ const express = require('express');
 const {
   registrarUsuario,
   iniciarSesion,
-  obtenerUsuarioActual
+  obtenerUsuarioActual,
+  actualizarPreferenciasMusicales
 } = require('../controllers/usuarioController');
 
 const {
@@ -19,6 +20,11 @@ router.get(
   '/me',
   verificarToken,
   obtenerUsuarioActual
+);
+router.patch(
+  '/me/preferencias-musicales',
+  verificarToken,
+  actualizarPreferenciasMusicales
 );
 
 module.exports = router;

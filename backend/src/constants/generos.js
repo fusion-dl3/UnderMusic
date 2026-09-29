@@ -1,0 +1,37 @@
+const GENEROS_MUSICALES = [
+  'Pop',
+  'Rock',
+  'Indie',
+  'Alternativa',
+  'Hip-Hop/Rap',
+  'Trap',
+  'Reguetón',
+  'Drill',
+  'Plug',
+  'Detroit',
+  'Lo-fi Hip-Hop',
+  'R&B',
+  'Electrónica',
+  'House',
+  'Techno',
+  'Funk',
+  'Soul',
+  'Metal',
+  'Punk',
+  'Reggae',
+  'Cumbia',
+  'Salsa',
+  'Jazz',
+  'Folk',
+  'Afrobeat',
+  'Jersey Club',
+  'Dembow',
+  'Dancehall',
+  'Hyperpop',
+  'Synthpop',
+  'Synthwave'
+];
+
+module.exports = {
+  GENEROS_MUSICALES
+};
