@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -44,6 +45,8 @@ export default function RegistroScreen() {
 
   const [selectorAbierto, setSelectorAbierto] =
     useState<TipoSelector>(null);
+    const [registrando, setRegistrando] = useState(false);
+    const [mensajeError, setMensajeError] = useState('');
   
 const buttonScale = useRef(new Animated.Value(1)).current;
 
@@ -105,9 +108,107 @@ useEffect(() => {
     setSelectorAbierto(null);
   };
 
-  const probarRegistroVisual = () => {
-    console.log('Formulario visual de registro listo para conectar.');
-  };
+  const registrarUsuario = async () => {
+  setMensajeError('');
+
+  const nombreUsuarioLimpio = nombreUsuario.trim();
+  const correoLimpio = correoCuenta.trim();
+
+  if (!nombreUsuarioLimpio) {
+    setMensajeError('Ingresa un nombre de usuario.');
+    return;
+  }
+
+  if (!correoLimpio) {
+    setMensajeError('Ingresa tu correo electrónico.');
+    return;
+  }
+
+  const patronCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!patronCorreo.test(correoLimpio)) {
+    setMensajeError('Ingresa un correo electrónico válido.');
+    return;
+  }
+
+  if (password.length < 6) {
+    setMensajeError('La contraseña debe tener al menos 6 caracteres.');
+    return;
+  }
+
+  if (!rol) {
+    setMensajeError('Selecciona si tu cuenta será Artista u Oyente.');
+    return;
+  }
+
+  if (!pais || !region || !comuna) {
+    setMensajeError('Selecciona tu país, región y comuna.');
+    return;
+  }
+
+  if (priorizarComuna === null) {
+    setMensajeError(
+      'Indica si quieres priorizar artistas de tu comuna.'
+    );
+    return;
+  }
+
+  try {
+    setRegistrando(true);
+
+    const respuesta = await fetch(
+      'http://192.168.1.13:3000/api/usuarios/registro',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nombreUsuario: nombreUsuarioLimpio,
+          correoCuenta: correoLimpio,
+          password,
+          rol,
+          pais,
+          region,
+          comuna,
+          generosFavoritos: [],
+          priorizarComuna,
+        }),
+      }
+    );
+
+    const datos = await respuesta.json();
+
+    if (!respuesta.ok) {
+      setMensajeError(
+        datos.message || 'No fue posible crear la cuenta.'
+      );
+      return;
+    }
+
+    if (!datos.token) {
+      setMensajeError(
+        'El servidor no entregó una sesión válida.'
+      );
+      return;
+    }
+
+    await SecureStore.setItemAsync('token', datos.token);
+
+    console.log('Usuario registrado correctamente');
+    console.log('Sesión guardada correctamente');
+
+    router.replace('/preferencias-musicales');
+  } catch (error) {
+    console.error('Error al registrar usuario:', error);
+
+    setMensajeError(
+      'No fue posible conectar con UnderMusic. Inténtalo nuevamente.'
+    );
+  } finally {
+    setRegistrando(false);
+  }
+};
 
   return (
     <View style={styles.container}>
@@ -429,6 +530,11 @@ useEffect(() => {
                     </Text>
                   </Pressable>
                 </View>
+                {mensajeError ? (
+  <Text style={styles.errorText}>
+    {mensajeError}
+  </Text>
+) : null}
 
                 <Animated.View
   style={{
@@ -436,10 +542,12 @@ useEffect(() => {
   }}
 >
   <Pressable
-    onPress={probarRegistroVisual}
+    onPress={registrarUsuario}
+disabled={registrando}
     style={({ pressed }) => [
       styles.registerPressable,
       pressed && styles.buttonPressed,
+      registrando && styles.buttonDisabled,
     ]}
   >
     <LinearGradient
@@ -455,8 +563,8 @@ useEffect(() => {
       />
 
       <Text style={styles.registerButtonText}>
-        Registrarse
-      </Text>
+  {registrando ? 'Creando cuenta...' : 'Registrarse'}
+</Text>
     </LinearGradient>
   </Pressable>
 </Animated.View>
@@ -948,7 +1056,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
+errorText: {
+  color: '#FF6B9E',
+  fontSize: 14,
+  fontWeight: '600',
+  textAlign: 'center',
+  marginBottom: 14,
+},
 
+buttonDisabled: {
+  opacity: 0.7,
+},
   buttonPressed: {
     opacity: 0.82,
   },
