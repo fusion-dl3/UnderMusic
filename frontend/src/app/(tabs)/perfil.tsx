@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   ImageBackground,
   Pressable,
   ScrollView,
@@ -161,14 +162,24 @@ export default function PerfilScreen() {
 
           <View style={styles.profileSection}>
             <View style={styles.avatarBorder}>
-              <View style={styles.avatar}>
-                <Ionicons
-                  name="person"
-                  size={72}
-                  color="#D8A6FF"
-                />
-              </View>
-            </View>
+  <View style={styles.avatar}>
+    {usuario.fotoPerfil ? (
+      <Image
+        source={{
+          uri: `http://192.168.1.14:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
+        }}
+        style={styles.avatarImage}
+        resizeMode="cover"
+      />
+    ) : (
+      <Ionicons
+        name="person"
+        size={72}
+        color="#D8A6FF"
+      />
+    )}
+  </View>
+</View>
 
             <Text style={styles.username}>
               @{usuario.nombreUsuario}
@@ -382,6 +393,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  avatarImage: {
+  width: '100%',
+  height: '100%',
+  borderRadius: 40,
+},
 
   username: {
     color: '#FFFFFF',

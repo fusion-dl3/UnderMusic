@@ -1,9 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import * as ImagePicker from 'expo-image-picker';
+import {
+  File,
+  UploadType,
+} from 'expo-file-system';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   ImageBackground,
   Modal,
   Pressable,
@@ -34,6 +40,7 @@ type Usuario = {
   };
   generosFavoritos: string[];
   priorizarComuna: boolean;
+  mostrarUbicacion: boolean;
 };
 
 type TipoSelector = 'pais' | 'region' | 'comuna' | null;
@@ -48,11 +55,13 @@ export default function EditarPerfilScreen() {
   const [comuna, setComuna] = useState('');
   const [generosFavoritos, setGenerosFavoritos] = useState<string[]>([]);
   const [priorizarComuna, setPriorizarComuna] = useState(false);
+  const [mostrarUbicacion, setMostrarUbicacion] = useState(false);
 
 const [cargando, setCargando] = useState(true);
 const [guardando, setGuardando] = useState(false);
 const [error, setError] = useState('');
 const [errorGuardado, setErrorGuardado] = useState('');
+const [fotoPerfilTemporal, setFotoPerfilTemporal] = useState<string | null>(null);
 const [modalSalirVisible, setModalSalirVisible] = useState(false);
   const [selectorAbierto, setSelectorAbierto] =
     useState<TipoSelector>(null);
@@ -100,6 +109,7 @@ const [modalSalirVisible, setModalSalirVisible] = useState(false);
       setComuna(usuario.ubicacion.comuna);
       setGenerosFavoritos(usuario.generosFavoritos || []);
       setPriorizarComuna(usuario.priorizarComuna);
+      setMostrarUbicacion(usuario.mostrarUbicacion ?? false);
     } catch (error) {
       console.error('Error al cargar edición de perfil:', error);
       setError('No fue posible conectar con UnderMusic.');
@@ -107,6 +117,44 @@ const [modalSalirVisible, setModalSalirVisible] = useState(false);
       setCargando(false);
     }
   };
+const seleccionarFotoPerfil = async () => {
+  try {
+    const permiso =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permiso.granted) {
+      setErrorGuardado(
+        'Necesitamos permiso para acceder a tus fotos.'
+      );
+      return;
+    }
+
+    const resultado = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (resultado.canceled) {
+      return;
+    }
+
+    const imagenSeleccionada = resultado.assets[0];
+
+    setFotoPerfilTemporal(imagenSeleccionada.uri);
+    setErrorGuardado('');
+  } catch (error) {
+    console.error(
+      'Error al seleccionar foto de perfil:',
+      error
+    );
+
+    setErrorGuardado(
+      'No fue posible seleccionar la imagen.'
+    );
+  }
+};
 
   const regionesDisponibles =
     REGIONES_POR_PAIS[pais] || [];
@@ -129,21 +177,25 @@ const [modalSalirVisible, setModalSalirVisible] = useState(false);
       );
 
     return (
-      nombreUsuario !== usuarioOriginal.nombreUsuario ||
-      pais !== usuarioOriginal.ubicacion.pais ||
-      region !== usuarioOriginal.ubicacion.region ||
-      comuna !== usuarioOriginal.ubicacion.comuna ||
-      priorizarComuna !== usuarioOriginal.priorizarComuna ||
-      !mismosGeneros
-    );
+  fotoPerfilTemporal !== null ||
+  nombreUsuario !== usuarioOriginal.nombreUsuario ||
+  pais !== usuarioOriginal.ubicacion.pais ||
+  region !== usuarioOriginal.ubicacion.region ||
+  comuna !== usuarioOriginal.ubicacion.comuna ||
+  priorizarComuna !== usuarioOriginal.priorizarComuna ||
+  mostrarUbicacion !== (usuarioOriginal.mostrarUbicacion ?? false) ||
+  !mismosGeneros
+);
   }, [
     usuarioOriginal,
+    fotoPerfilTemporal,
     nombreUsuario,
     pais,
     region,
     comuna,
     generosFavoritos,
     priorizarComuna,
+    mostrarUbicacion,
   ]);
 
 const intentarSalir = () => {
@@ -181,7 +233,7 @@ const descartarCambios = () => {
       return;
     }
 
-    const respuesta = await fetch(
+    const respuestaPerfil = await fetch(
       'http://192.168.1.14:3000/api/usuarios/me/perfil',
       {
         method: 'PATCH',
@@ -196,17 +248,86 @@ const descartarCambios = () => {
           comuna,
           generosFavoritos,
           priorizarComuna,
+          mostrarUbicacion,
         }),
       }
     );
 
-    const datos = await respuesta.json();
+    const datosPerfil = await respuestaPerfil.json();
 
-    if (!respuesta.ok) {
+    if (!respuestaPerfil.ok) {
       setErrorGuardado(
-        datos.message || 'No fue posible guardar los cambios.'
+        datosPerfil.message ||
+          'No fue posible guardar los cambios.'
       );
       return;
+    }
+
+        if (fotoPerfilTemporal) {
+      const nombreArchivo =
+        fotoPerfilTemporal.split('/').pop() ||
+        'foto-perfil.jpg';
+
+      const extension =
+        nombreArchivo
+          .split('.')
+          .pop()
+          ?.toLowerCase() || 'jpg';
+
+      let tipoImagen = 'image/jpeg';
+
+      if (extension === 'png') {
+        tipoImagen = 'image/png';
+      }
+
+      if (extension === 'webp') {
+        tipoImagen = 'image/webp';
+      }
+
+      const archivoFoto = new File(fotoPerfilTemporal);
+
+      const resultadoFoto = await archivoFoto.upload(
+        'http://192.168.1.14:3000/api/usuarios/me/foto-perfil',
+        {
+          httpMethod: 'PATCH',
+          uploadType: UploadType.MULTIPART,
+          fieldName: 'foto',
+          mimeType: tipoImagen,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      let datosFoto: {
+        message?: string;
+        fotoPerfil?: string;
+      } = {};
+
+      try {
+        datosFoto = JSON.parse(resultadoFoto.body);
+      } catch {
+        console.error(
+          'Respuesta no JSON al guardar foto:',
+          resultadoFoto.body
+        );
+
+        setErrorGuardado(
+          'El servidor respondió de forma inesperada al guardar la foto.'
+        );
+        return;
+      }
+
+      if (
+        resultadoFoto.status < 200 ||
+        resultadoFoto.status >= 300
+      ) {
+        setErrorGuardado(
+          datosFoto.message ||
+            'Los datos se guardaron, pero no fue posible guardar la foto.'
+        );
+        return;
+      }
     }
 
     router.back();
@@ -355,23 +476,45 @@ const descartarCambios = () => {
           </View>
 
           <View style={styles.avatarSection}>
-            <View style={styles.avatarBorder}>
-              <View style={styles.avatar}>
-                <Ionicons
-                  name="person"
-                  size={69}
-                  color="#D8A6FF"
-                />
+            <Pressable
+  onPress={seleccionarFotoPerfil}
+  style={({ pressed }) => [
+    styles.avatarBorder,
+    pressed && styles.buttonPressed,
+  ]}
+>
+  <View style={styles.avatar}>
+    {fotoPerfilTemporal ? (
+  <Image
+    source={{ uri: fotoPerfilTemporal }}
+    style={styles.avatarImage}
+    resizeMode="cover"
+  />
+) : usuarioOriginal?.fotoPerfil ? (
+  <Image
+    source={{
+      uri: `http://192.168.1.14:3000/api/usuarios/foto-perfil/${usuarioOriginal.fotoPerfil}`,
+    }}
+    style={styles.avatarImage}
+    resizeMode="cover"
+  />
+) : (
+  <Ionicons
+    name="person"
+    size={72}
+    color="#D8A6FF"
+  />
+)}
 
-                <View style={styles.avatarEdit}>
-                  <Ionicons
-                    name="pencil"
-                    size={19}
-                    color="#FFFFFF"
-                  />
-                </View>
-              </View>
-            </View>
+    <View style={styles.avatarEdit}>
+      <Ionicons
+        name="pencil"
+        size={19}
+        color="#FFFFFF"
+      />
+    </View>
+  </View>
+</Pressable>
 
             <Text style={styles.photoHint}>
               Cambiar foto de perfil
@@ -571,6 +714,73 @@ const descartarCambios = () => {
               </View>
             </View>
           </View>
+                     {usuarioOriginal.rol === 'oyente' ? (
+            <View style={styles.section}>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={25}
+                  color="#59DFFF"
+                />
+
+                <Text style={styles.sectionTitleWithIcon}>
+                  Privacidad
+                </Text>
+              </View>
+
+              <View style={styles.localPreferenceCard}>
+                <View style={styles.localPreferenceInfo}>
+                  <Text style={styles.localPreferenceTitle}>
+                    Mostrar mi ubicación
+                  </Text>
+
+                  <Text style={styles.localPreferenceSubtitle}>
+                    Permite que otros usuarios vean tu comuna y región.
+                  </Text>
+                </View>
+
+                <View style={styles.preferenceButtons}>
+                  <Pressable
+                    onPress={() => setMostrarUbicacion(true)}
+                    style={[
+                      styles.preferenceButton,
+                      mostrarUbicacion &&
+                        styles.preferenceButtonSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.preferenceButtonText,
+                        mostrarUbicacion &&
+                          styles.preferenceButtonTextSelected,
+                      ]}
+                    >
+                      Sí
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => setMostrarUbicacion(false)}
+                    style={[
+                      styles.preferenceButton,
+                      !mostrarUbicacion &&
+                        styles.preferenceButtonSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.preferenceButtonText,
+                        !mostrarUbicacion &&
+                          styles.preferenceButtonTextSelected,
+                      ]}
+                    >
+                      No
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          ) : null}
 
           {errorGuardado ? (
   <View style={styles.saveErrorContainer}>
@@ -830,6 +1040,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#171026',
     position: 'relative',
   },
+
+  avatarImage: {
+  width: '100%',
+  height: '100%',
+  borderRadius: 36,
+},
 
   avatarEdit: {
     position: 'absolute',

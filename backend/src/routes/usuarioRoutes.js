@@ -9,8 +9,17 @@ const {
 } = require('../controllers/usuarioController');
 
 const {
+  subirFotoPerfil,
+  obtenerFotoPerfil
+} = require('../controllers/fotoPerfilController');
+
+const {
   verificarToken
 } = require('../middlewares/authMiddleware');
+
+const {
+  subirImagenPerfil
+} = require('../middlewares/uploadImagenMiddleware');
 
 const router = express.Router();
 
@@ -33,6 +42,18 @@ router.patch(
   '/me/perfil',
   verificarToken,
   actualizarPerfilUsuario
+);
+
+router.patch(
+  '/me/foto-perfil',
+  verificarToken,
+  subirImagenPerfil.single('foto'),
+  subirFotoPerfil
+);
+
+router.get(
+  '/foto-perfil/:fotoId',
+  obtenerFotoPerfil
 );
 
 module.exports = router;

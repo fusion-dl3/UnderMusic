@@ -162,9 +162,10 @@ if (
 },
 
       generosFavoritos: generosNormalizados,
-      priorizarComuna,
+priorizarComuna,
+mostrarUbicacion: false,
 
-      fechaCreacion: fechaActual,
+fechaCreacion: fechaActual,
       fechaActualizacion: fechaActual
     };
 
@@ -193,6 +194,7 @@ if (
         ubicacion: nuevoUsuario.ubicacion,
         generosFavoritos: nuevoUsuario.generosFavoritos,
         priorizarComuna: nuevoUsuario.priorizarComuna,
+        mostrarUbicacion: nuevoUsuario.mostrarUbicacion,
         fechaCreacion: nuevoUsuario.fechaCreacion
       }
     });
@@ -272,7 +274,8 @@ async function iniciarSesion(req, res) {
         fotoPerfil: usuario.fotoPerfil,
         ubicacion: usuario.ubicacion,
         generosFavoritos: usuario.generosFavoritos,
-        priorizarComuna: usuario.priorizarComuna
+        priorizarComuna: usuario.priorizarComuna,
+        mostrarUbicacion: usuario.mostrarUbicacion === true
       }
     });
   } catch (error) {
@@ -308,6 +311,7 @@ async function obtenerUsuarioActual(req, res) {
         ubicacion: usuario.ubicacion,
         generosFavoritos: usuario.generosFavoritos,
         priorizarComuna: usuario.priorizarComuna,
+        mostrarUbicacion: usuario.mostrarUbicacion === true,
         fechaCreacion: usuario.fechaCreacion
       }
     });
@@ -398,8 +402,14 @@ async function actualizarPerfilUsuario(req, res) {
       region,
       comuna,
       generosFavoritos,
-      priorizarComuna
+      priorizarComuna,
+      mostrarUbicacion
     } = req.body;
+    if (typeof mostrarUbicacion !== 'boolean') {
+  return res.status(400).json({
+    message: 'La preferencia de privacidad de ubicación no es válida'
+  });
+}
 
     if (
       typeof nombreUsuario !== 'string' ||
@@ -507,6 +517,7 @@ if (
 },
           generosFavoritos: generosNormalizados,
           priorizarComuna,
+          mostrarUbicacion,
           fechaActualizacion: new Date()
         }
       },
@@ -531,7 +542,8 @@ if (
         fotoPerfil: resultado.fotoPerfil,
         ubicacion: resultado.ubicacion,
         generosFavoritos: resultado.generosFavoritos,
-        priorizarComuna: resultado.priorizarComuna
+        priorizarComuna: resultado.priorizarComuna,
+        mostrarUbicacion: resultado.mostrarUbicacion
       }
     });
   } catch (error) {

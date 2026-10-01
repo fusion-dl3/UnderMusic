@@ -8,19 +8,34 @@ if (!uri) {
 
 const client = new MongoClient(uri);
 
+let database = null;
+
 async function connectDatabase() {
   await client.connect();
 
-  const database = client.db('undermusic');
+  database = client.db('undermusic');
 
   await database.command({ ping: 1 });
 
-  console.log('Conexion a MongoDB Atlas establecida correctamente');
+  console.log(
+    'Conexion a MongoDB Atlas establecida correctamente'
+  );
+
+  return database;
+}
+
+function getDatabase() {
+  if (!database) {
+    throw new Error(
+      'La base de datos aun no ha sido inicializada'
+    );
+  }
 
   return database;
 }
 
 module.exports = {
   connectDatabase,
+  getDatabase,
   client
 };
