@@ -86,7 +86,7 @@ export default function PreferenciasMusicalesScreen() {
       }
 
       const respuesta = await fetch(
-        'http://192.168.1.13:3000/api/usuarios/me/preferencias-musicales',
+        'http://192.168.1.14:3000/api/usuarios/me/preferencias-musicales',
         {
           method: 'PATCH',
           headers: {

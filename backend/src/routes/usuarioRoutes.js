@@ -4,7 +4,8 @@ const {
   registrarUsuario,
   iniciarSesion,
   obtenerUsuarioActual,
-  actualizarPreferenciasMusicales
+  actualizarPreferenciasMusicales,
+  actualizarPerfilUsuario
 } = require('../controllers/usuarioController');
 
 const {
@@ -21,10 +22,17 @@ router.get(
   verificarToken,
   obtenerUsuarioActual
 );
+
 router.patch(
   '/me/preferencias-musicales',
   verificarToken,
   actualizarPreferenciasMusicales
+);
+
+router.patch(
+  '/me/perfil',
+  verificarToken,
+  actualizarPerfilUsuario
 );
 
 module.exports = router;

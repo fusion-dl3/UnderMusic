@@ -7,6 +7,9 @@ const {
   GENEROS_MUSICALES
 } = require('../constants/generos');
 const {
+  esUbicacionValida
+} = require('../constants/ubicaciones');
+const {
   normalizarNombreUsuario,
   normalizarCorreo,
   esNombreUsuarioValido,
@@ -65,7 +68,21 @@ async function registrarUsuario(req, res) {
         message: 'El rol debe ser oyente o artista'
       });
     }
+const paisNormalizado = pais.trim();
+const regionNormalizada = region.trim();
+const comunaNormalizada = comuna.trim();
 
+if (
+  !esUbicacionValida(
+    paisNormalizado,
+    regionNormalizada,
+    comunaNormalizada
+  )
+) {
+  return res.status(400).json({
+    message: 'La ubicación seleccionada no es válida'
+  });
+}
     if (typeof priorizarComuna !== 'boolean') {
       return res.status(400).json({
         message: 'Debes indicar si deseas priorizar artistas de tu comuna'
@@ -92,6 +109,16 @@ async function registrarUsuario(req, res) {
           .filter((genero) => genero.length > 0)
       )
     ];
+
+    const generosInvalidos = generosNormalizados.filter(
+      (genero) => !GENEROS_MUSICALES.includes(genero)
+    );
+
+    if (generosInvalidos.length > 0) {
+      return res.status(400).json({
+        message: 'Uno o mas generos musicales no son validos'
+      });
+    }
 
     const usuarios = getUsuariosCollection();
 
@@ -129,10 +156,10 @@ async function registrarUsuario(req, res) {
       fotoPerfil: null,
 
       ubicacion: {
-        pais: pais.trim(),
-        region: region.trim(),
-        comuna: comuna.trim()
-      },
+  pais: paisNormalizado,
+  region: regionNormalizada,
+  comuna: comunaNormalizada
+},
 
       generosFavoritos: generosNormalizados,
       priorizarComuna,
@@ -292,6 +319,7 @@ async function obtenerUsuarioActual(req, res) {
     });
   }
 }
+
 async function actualizarPreferenciasMusicales(req, res) {
   try {
     const {
@@ -361,9 +389,170 @@ async function actualizarPreferenciasMusicales(req, res) {
     });
   }
 }
+
+async function actualizarPerfilUsuario(req, res) {
+  try {
+    const {
+      nombreUsuario,
+      pais,
+      region,
+      comuna,
+      generosFavoritos,
+      priorizarComuna
+    } = req.body;
+
+    if (
+      typeof nombreUsuario !== 'string' ||
+      typeof pais !== 'string' ||
+      typeof region !== 'string' ||
+      typeof comuna !== 'string'
+    ) {
+      return res.status(400).json({
+        message: 'Los datos del perfil no son validos'
+      });
+    }
+
+    if (
+      !nombreUsuario.trim() ||
+      !pais.trim() ||
+      !region.trim() ||
+      !comuna.trim()
+    ) {
+      return res.status(400).json({
+        message: 'Nombre de usuario y ubicacion son obligatorios'
+      });
+    }
+const paisNormalizado = pais.trim();
+const regionNormalizada = region.trim();
+const comunaNormalizada = comuna.trim();
+
+if (
+  !esUbicacionValida(
+    paisNormalizado,
+    regionNormalizada,
+    comunaNormalizada
+  )
+) {
+  return res.status(400).json({
+    message: 'La ubicación seleccionada no es válida'
+  });
+}
+    if (!Array.isArray(generosFavoritos)) {
+      return res.status(400).json({
+        message: 'Los generos favoritos deben enviarse como una lista'
+      });
+    }
+
+    if (typeof priorizarComuna !== 'boolean') {
+      return res.status(400).json({
+        message: 'La preferencia de comuna no es valida'
+      });
+    }
+
+    const nombreUsuarioNormalizado =
+      normalizarNombreUsuario(nombreUsuario);
+
+    if (!esNombreUsuarioValido(nombreUsuarioNormalizado)) {
+      return res.status(400).json({
+        message:
+          'El nombre de usuario debe tener entre 1 y 30 caracteres y solo puede contener letras, numeros, ñ, punto, guion y guion bajo'
+      });
+    }
+
+    const generosNormalizados = [
+      ...new Set(
+        generosFavoritos
+          .filter((genero) => typeof genero === 'string')
+          .map((genero) => genero.trim())
+          .filter((genero) => genero.length > 0)
+      )
+    ];
+
+    const generosInvalidos = generosNormalizados.filter(
+      (genero) => !GENEROS_MUSICALES.includes(genero)
+    );
+
+    if (generosInvalidos.length > 0) {
+      return res.status(400).json({
+        message: 'Uno o mas generos musicales no son validos'
+      });
+    }
+
+    const usuarios = getUsuariosCollection();
+
+    const usuarioConMismoNombre = await usuarios.findOne({
+      nombreUsuario: nombreUsuarioNormalizado,
+      _id: {
+        $ne: new ObjectId(req.usuario.id)
+      }
+    });
+
+    if (usuarioConMismoNombre) {
+      return res.status(409).json({
+        message: 'El nombre de usuario ya esta registrado'
+      });
+    }
+
+    const resultado = await usuarios.findOneAndUpdate(
+      {
+        _id: new ObjectId(req.usuario.id)
+      },
+      {
+        $set: {
+          nombreUsuario: nombreUsuarioNormalizado,
+          ubicacion: {
+  pais: paisNormalizado,
+  region: regionNormalizada,
+  comuna: comunaNormalizada
+},
+          generosFavoritos: generosNormalizados,
+          priorizarComuna,
+          fechaActualizacion: new Date()
+        }
+      },
+      {
+        returnDocument: 'after'
+      }
+    );
+
+    if (!resultado) {
+      return res.status(404).json({
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Perfil actualizado correctamente',
+      usuario: {
+        id: resultado._id,
+        nombreUsuario: resultado.nombreUsuario,
+        correoCuenta: resultado.correoCuenta,
+        rol: resultado.rol,
+        fotoPerfil: resultado.fotoPerfil,
+        ubicacion: resultado.ubicacion,
+        generosFavoritos: resultado.generosFavoritos,
+        priorizarComuna: resultado.priorizarComuna
+      }
+    });
+  } catch (error) {
+    if (error && error.code === 11000) {
+      return res.status(409).json({
+        message: 'El nombre de usuario ya esta registrado'
+      });
+    }
+
+    console.error('Error al actualizar perfil:', error);
+
+    return res.status(500).json({
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 module.exports = {
   registrarUsuario,
   iniciarSesion,
   obtenerUsuarioActual,
-  actualizarPreferenciasMusicales
+  actualizarPreferenciasMusicales,
+  actualizarPerfilUsuario
 };
