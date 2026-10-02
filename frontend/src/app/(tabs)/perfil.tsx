@@ -29,16 +29,34 @@ type Usuario = {
   priorizarComuna: boolean;
 };
 
+type PerfilArtista = {
+  id: string;
+  usuarioId: string;
+  nombreArtistico: string;
+  biografia: string;
+  generoPrincipal: string;
+  generosAdicionales: string[];
+  correoContacto: string;
+  instagram: string;
+  facebook: string;
+  twitter: string;
+  perfilCompleto: boolean;
+};
+
 export default function PerfilScreen() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
+
+  const [perfilArtista, setPerfilArtista] =
+    useState<PerfilArtista | null>(null);
+
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
   useFocusEffect(
-  useCallback(() => {
-    cargarPerfil();
-  }, [])
-);;
+    useCallback(() => {
+      cargarPerfil();
+    }, [])
+  );
 
   const cargarPerfil = async () => {
     try {
@@ -52,7 +70,7 @@ export default function PerfilScreen() {
         return;
       }
 
-      const respuesta = await fetch(
+      const respuestaUsuario = await fetch(
         'http://192.168.1.14:3000/api/usuarios/me',
         {
           method: 'GET',
@@ -62,16 +80,48 @@ export default function PerfilScreen() {
         }
       );
 
-      const datos = await respuesta.json();
+      const datosUsuario = await respuestaUsuario.json();
 
-      if (!respuesta.ok) {
+      if (!respuestaUsuario.ok) {
         setError(
-          datos.message || 'No fue posible cargar tu perfil.'
+          datosUsuario.message ||
+            'No fue posible cargar tu perfil.'
         );
         return;
       }
 
-      setUsuario(datos.usuario);
+      const usuarioCargado: Usuario = datosUsuario.usuario;
+
+      setUsuario(usuarioCargado);
+
+      if (usuarioCargado.rol === 'artista') {
+        const respuestaPerfilArtista = await fetch(
+          'http://192.168.1.14:3000/api/perfiles-artista/me',
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const datosPerfilArtista =
+          await respuestaPerfilArtista.json();
+
+        if (!respuestaPerfilArtista.ok) {
+          setError(
+            datosPerfilArtista.message ||
+              'No fue posible cargar tu perfil artístico.'
+          );
+          return;
+        }
+
+        setPerfilArtista(
+          datosPerfilArtista.perfilArtista || null
+        );
+      } else {
+        setPerfilArtista(null);
+      }
     } catch (error) {
       console.error('Error al cargar el perfil:', error);
 
@@ -109,35 +159,32 @@ export default function PerfilScreen() {
     );
   }
 
+  const esArtista = usuario.rol === 'artista';
+
   return (
     <ImageBackground
       source={require('../../../assets/images/fondo-app.png')}
       style={styles.background}
       resizeMode="cover"
     >
-      <SafeAreaView
-        style={styles.safeArea}
-        edges={['top']}
-      >
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>
-              Mi perfil
-            </Text>
+            <Text style={styles.headerTitle}>Mi perfil</Text>
 
             <View style={styles.headerActions}>
               <Pressable
-  onPress={() => {
-    router.push('/editar-perfil');
-  }}
-  style={({ pressed }) => [
-    styles.headerButton,
-    pressed && styles.buttonPressed,
-  ]}
->
+                onPress={() => {
+                  router.push('/editar-perfil');
+                }}
+                style={({ pressed }) => [
+                  styles.headerButton,
+                  pressed && styles.buttonPressed,
+                ]}
+              >
                 <Ionicons
                   name="pencil-outline"
                   size={27}
@@ -162,34 +209,45 @@ export default function PerfilScreen() {
 
           <View style={styles.profileSection}>
             <View style={styles.avatarBorder}>
-  <View style={styles.avatar}>
-    {usuario.fotoPerfil ? (
-      <Image
-        source={{
-          uri: `http://192.168.1.14:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
-        }}
-        style={styles.avatarImage}
-        resizeMode="cover"
-      />
-    ) : (
-      <Ionicons
-        name="person"
-        size={72}
-        color="#D8A6FF"
-      />
-    )}
-  </View>
-</View>
+              <View style={styles.avatar}>
+                {usuario.fotoPerfil ? (
+                  <Image
+                    source={{
+                      uri: `http://192.168.1.14:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
+                    }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Ionicons
+                    name="person"
+                    size={72}
+                    color="#D8A6FF"
+                  />
+                )}
+              </View>
+            </View>
 
-            <Text style={styles.username}>
-              @{usuario.nombreUsuario}
-            </Text>
+            {esArtista &&
+            perfilArtista?.nombreArtistico ? (
+              <>
+                <Text style={styles.artistName}>
+                  {perfilArtista.nombreArtistico}
+                </Text>
+
+                <Text style={styles.artistUsername}>
+                  @{usuario.nombreUsuario}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.username}>
+                @{usuario.nombreUsuario}
+              </Text>
+            )}
 
             <View style={styles.roleBadge}>
               <Text style={styles.roleText}>
-                {usuario.rol === 'artista'
-                  ? 'ARTISTA'
-                  : 'OYENTE'}
+                {esArtista ? 'ARTISTA' : 'OYENTE'}
               </Text>
             </View>
 
@@ -207,12 +265,214 @@ export default function PerfilScreen() {
             </View>
           </View>
 
-          <View style={styles.divider} />
+          {esArtista ? (
+            <>
+              <View style={styles.artistContent}>
+                {perfilArtista ? (
+                  <>
+                    <View style={styles.artistSection}>
+                      <View style={styles.sectionHeader}>
+                        <Ionicons
+                          name="person-outline"
+                          size={26}
+                          color="#E05BFF"
+                        />
+
+                        <Text style={styles.sectionTitle}>
+                          Sobre el artista
+                        </Text>
+                      </View>
+
+                      {perfilArtista.biografia ? (
+                        <Text style={styles.biography}>
+                          {perfilArtista.biografia}
+                        </Text>
+                      ) : (
+                        <Text style={styles.emptySimpleText}>
+                          Aún no has agregado una biografía.
+                        </Text>
+                      )}
+                    </View>
+
+                    <View style={styles.artistSection}>
+                      <View style={styles.sectionHeader}>
+                        <Ionicons
+                          name="musical-notes-outline"
+                          size={26}
+                          color="#59DFFF"
+                        />
+
+                        <Text style={styles.sectionTitle}>
+                          Géneros artísticos
+                        </Text>
+                      </View>
+
+                      {perfilArtista.generoPrincipal ? (
+                        <>
+                          <Text style={styles.genreLabel}>
+                            Género principal
+                          </Text>
+
+                          <View style={styles.artistGenresContainer}>
+                            <View
+                              style={[
+                                styles.artistGenreChip,
+                                styles.mainGenreChip,
+                              ]}
+                            >
+                              <Text
+                                style={styles.artistGenreText}
+                              >
+                                {perfilArtista.generoPrincipal}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {perfilArtista.generosAdicionales
+                            .length > 0 ? (
+                            <>
+                              <Text
+                                style={[
+                                  styles.genreLabel,
+                                  styles.additionalGenreLabel,
+                                ]}
+                              >
+                                Géneros adicionales
+                              </Text>
+
+                              <View
+                                style={
+                                  styles.artistGenresContainer
+                                }
+                              >
+                                {perfilArtista.generosAdicionales.map(
+                                  (genero) => (
+                                    <View
+                                      key={genero}
+                                      style={
+                                        styles.artistGenreChip
+                                      }
+                                    >
+                                      <Text
+                                        style={
+                                          styles.artistGenreText
+                                        }
+                                      >
+                                        {genero}
+                                      </Text>
+                                    </View>
+                                  )
+                                )}
+                              </View>
+                            </>
+                          ) : null}
+                        </>
+                      ) : (
+                        <Text style={styles.emptySimpleText}>
+                          Aún no has seleccionado tu género
+                          artístico principal.
+                        </Text>
+                      )}
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.incompleteArtistCard}>
+                    <View style={styles.incompleteIcon}>
+                      <Ionicons
+                        name="musical-notes-outline"
+                        size={28}
+                        color="#E8B0FF"
+                      />
+                    </View>
+
+                    <View style={styles.incompleteInfo}>
+                      <Text style={styles.incompleteTitle}>
+                        Completa tu perfil artístico
+                      </Text>
+
+                      <Text
+                        style={styles.incompleteDescription}
+                      >
+                        Agrega tu nombre artístico, biografía y
+                        género principal para completar tu perfil.
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                <Pressable
+                  onPress={() => {
+                    router.push('/editar-perfil-artista');
+                  }}
+                  style={({ pressed }) => [
+                    styles.artistProfileButton,
+                    pressed && styles.buttonPressed,
+                  ]}
+                >
+                  <Ionicons
+                    name="create-outline"
+                    size={21}
+                    color="#E5B4FF"
+                  />
+
+                  <Text
+                    style={styles.artistProfileButtonText}
+                  >
+                    Editar perfil artístico
+                  </Text>
+
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color="#C68AFF"
+                  />
+                </Pressable>
+
+                <View style={styles.divider} />
+
+                <View style={styles.songsSection}>
+                  <View style={styles.sectionHeader}>
+                    <Ionicons
+                      name="disc-outline"
+                      size={27}
+                      color="#FF68B7"
+                    />
+
+                    <Text style={styles.sectionTitle}>
+                      Canciones
+                    </Text>
+                  </View>
+
+                  <View style={styles.emptySongsCard}>
+                    <View style={styles.emptySongsIcon}>
+                      <Ionicons
+                        name="musical-note-outline"
+                        size={32}
+                        color="#C487EE"
+                      />
+                    </View>
+
+                    <Text style={styles.emptySongsTitle}>
+                      Aún no has publicado canciones
+                    </Text>
+
+                    <Text style={styles.emptySongsDescription}>
+                      Tus canciones aparecerán aquí cuando
+                      comencemos a implementar la publicación de
+                      música.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+            </>
+          ) : null}
 
           <View style={styles.preferencesSection}>
             <View style={styles.sectionHeader}>
               <Ionicons
-                name="musical-notes-outline"
+                name="headset-outline"
                 size={27}
                 color="#E05BFF"
               />
@@ -225,10 +485,7 @@ export default function PerfilScreen() {
             {usuario.generosFavoritos.length > 0 ? (
               <View style={styles.genresContainer}>
                 {usuario.generosFavoritos.map((genero) => (
-                  <View
-                    key={genero}
-                    style={styles.genreChip}
-                  >
+                  <View key={genero} style={styles.genreChip}>
                     <Text style={styles.genreText}>
                       {genero}
                     </Text>
@@ -238,15 +495,19 @@ export default function PerfilScreen() {
             ) : (
               <View style={styles.emptyPreferences}>
                 <Text style={styles.emptyTitle}>
-                  Aún no has seleccionado tus géneros favoritos
+                  Aún no has seleccionado tus géneros
+                  favoritos
                 </Text>
 
                 <Text style={styles.emptyDescription}>
-                  Elige los estilos de música que más te gustan
-                  para mejorar tus recomendaciones.
+                  Elige los estilos de música que más te
+                  gustan para mejorar tus recomendaciones.
                 </Text>
 
                 <Pressable
+                  onPress={() => {
+                    router.push('/editar-perfil');
+                  }}
                   style={({ pressed }) => [
                     styles.chooseGenresButton,
                     pressed && styles.buttonPressed,
@@ -279,7 +540,9 @@ export default function PerfilScreen() {
                   Priorizar artistas de mi comuna
                 </Text>
 
-                <Text style={styles.localPreferenceSubtitle}>
+                <Text
+                  style={styles.localPreferenceSubtitle}
+                >
                   Da mayor prioridad a artistas cercanos a ti.
                 </Text>
               </View>
@@ -395,16 +658,31 @@ const styles = StyleSheet.create({
   },
 
   avatarImage: {
-  width: '100%',
-  height: '100%',
-  borderRadius: 40,
-},
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
+  },
 
   username: {
     color: '#FFFFFF',
     fontSize: 31,
     fontWeight: '800',
     textAlign: 'center',
+  },
+
+  artistName: {
+    color: '#FFFFFF',
+    fontSize: 31,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+
+  artistUsername: {
+    color: '#AAA2B2',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 5,
   },
 
   roleBadge: {
@@ -440,16 +718,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  divider: {
-    height: 2,
+  artistContent: {
     width: '100%',
-    backgroundColor: 'rgba(126, 70, 220, 0.45)',
-    marginTop: 31,
-    marginBottom: 27,
+    marginTop: 30,
   },
 
-  preferencesSection: {
+  artistSection: {
     width: '100%',
+    marginBottom: 28,
   },
 
   sectionHeader: {
@@ -463,6 +739,168 @@ const styles = StyleSheet.create({
     fontSize: 23,
     fontWeight: '800',
     marginLeft: 10,
+  },
+
+  biography: {
+    color: '#C9C2D0',
+    fontSize: 15,
+    lineHeight: 23,
+  },
+
+  emptySimpleText: {
+    color: '#8E8797',
+    fontSize: 14,
+    lineHeight: 21,
+  },
+
+  genreLabel: {
+    color: '#A8A0B0',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 9,
+  },
+
+  additionalGenreLabel: {
+    marginTop: 18,
+  },
+
+  artistGenresContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 9,
+  },
+
+  artistGenreChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: 'rgba(50, 30, 70, 0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(152, 83, 205, 0.65)',
+  },
+
+  mainGenreChip: {
+    backgroundColor: 'rgba(105, 35, 167, 0.72)',
+    borderColor: '#C65BFF',
+  },
+
+  artistGenreText: {
+    color: '#EBCFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  incompleteArtistCard: {
+    width: '100%',
+    minHeight: 100,
+    padding: 18,
+    borderRadius: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 9, 34, 0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(185, 79, 255, 0.48)',
+    marginBottom: 20,
+  },
+
+  incompleteIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(128, 48, 186, 0.24)',
+  },
+
+  incompleteInfo: {
+    flex: 1,
+    marginLeft: 14,
+  },
+
+  incompleteTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+
+  incompleteDescription: {
+    color: '#AAA2B2',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
+  },
+
+  artistProfileButton: {
+    width: '100%',
+    minHeight: 58,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(76, 21, 121, 0.58)',
+    borderWidth: 1,
+    borderColor: 'rgba(190, 82, 255, 0.65)',
+  },
+
+  artistProfileButtonText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 10,
+  },
+
+  divider: {
+    height: 2,
+    width: '100%',
+    backgroundColor: 'rgba(126, 70, 220, 0.45)',
+    marginTop: 31,
+    marginBottom: 27,
+  },
+
+  songsSection: {
+    width: '100%',
+  },
+
+  emptySongsCard: {
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 25,
+    borderRadius: 22,
+    backgroundColor: 'rgba(12, 7, 28, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(137, 63, 209, 0.52)',
+  },
+
+  emptySongsIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(112, 48, 161, 0.20)',
+    marginBottom: 13,
+  },
+
+  emptySongsTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+
+  emptySongsDescription: {
+    color: '#9991A2',
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    marginTop: 7,
+  },
+
+  preferencesSection: {
+    width: '100%',
   },
 
   genresContainer: {
