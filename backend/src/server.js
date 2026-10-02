@@ -7,8 +7,12 @@ const { crearIndicesUsuarios } = require('./models/usuarioModel');
 const {
   crearIndicesPerfilesArtista
 } = require('./models/perfilArtistaModel');
+const {
+  crearIndicesCanciones
+} = require('./models/cancionModel');
 const usuarioRoutes = require('./routes/usuarioRoutes');
 const perfilArtistaRoutes = require('./routes/perfilArtistaRoutes');
+const cancionRoutes = require('./routes/cancionRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,12 +27,14 @@ app.get('/', (req, res) => {
 
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/perfiles-artista', perfilArtistaRoutes);
+app.use('/api/canciones', cancionRoutes);
 
 async function startServer() {
   try {
     await connectDatabase();
     await crearIndicesUsuarios();
     await crearIndicesPerfilesArtista();
+    await crearIndicesCanciones();
 
     app.listen(PORT, () => {
       console.log(`Servidor de UnderMusic ejecutandose en http://localhost:${PORT}`);

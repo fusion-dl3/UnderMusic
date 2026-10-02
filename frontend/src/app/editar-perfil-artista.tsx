@@ -449,7 +449,6 @@ export default function EditarPerfilArtistaScreen() {
                 placeholder="Ej: Luna Nocturna"
                 placeholderTextColor="#716B79"
                 style={styles.input}
-                maxLength={80}
               />
 
               <Text style={styles.fieldLabel}>
@@ -470,13 +469,13 @@ export default function EditarPerfilArtistaScreen() {
                 ]}
                 multiline
                 textAlignVertical="top"
-                maxLength={600}
+                maxLength={500}
               />
 
               <Text
                 style={styles.characterCounter}
               >
-                {biografia.length}/600
+                {biografia.length}/500
               </Text>
             </View>
 

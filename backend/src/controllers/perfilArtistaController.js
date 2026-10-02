@@ -97,6 +97,11 @@ async function actualizarMiPerfilArtista(req, res) {
     const nombreArtisticoNormalizado = nombreArtistico.trim();
     const biografiaNormalizada = biografia.trim();
     const generoPrincipalNormalizado = generoPrincipal.trim();
+    if (biografiaNormalizada.length > 500) {
+  return res.status(400).json({
+    message: 'La biografía no puede superar los 500 caracteres'
+  });
+}
 
     const generosAdicionalesNormalizados = [
       ...new Set(

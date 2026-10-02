@@ -3,6 +3,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
+import { MiniPlayer } from '@/components/MiniPlayer';
+
 function IndicadorActivo() {
   return (
     <LinearGradient
@@ -16,112 +18,147 @@ function IndicadorActivo() {
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
+    <View style={styles.container}>
+      <MiniPlayer />
 
-        tabBarStyle: {
-          backgroundColor: '#070318',
-          borderTopWidth: 0,
-          height: 88,
-          paddingTop: 8,
-          paddingBottom: 8,
-          elevation: 0,
-        },
+      <View style={styles.tabsContainer}>
+        <Tabs
+          screenOptions={{
+            headerShown: false,
 
-        tabBarActiveTintColor: '#FFFFFF',
-        tabBarInactiveTintColor: '#9C97A8',
+            tabBarStyle: {
+              backgroundColor: '#070318',
+              borderTopWidth: 0,
+              height: 88,
+              paddingTop: 8,
+              paddingBottom: 8,
+              elevation: 0,
+            },
 
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        },
+            tabBarActiveTintColor: '#FFFFFF',
+            tabBarInactiveTintColor: '#9C97A8',
 
-        tabBarItemStyle: {
-          paddingTop: 2,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="inicio"
-        options={{
-          title: 'Inicio',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name={focused ? 'home' : 'home-outline'}
-                color={color}
-                size={focused ? 30 : 25}
-              />
+            tabBarLabelStyle: {
+              fontSize: 12,
+              fontWeight: '600',
+            },
 
-              {focused ? <IndicadorActivo /> : null}
-            </View>
-          ),
-        }}
-      />
+            tabBarItemStyle: {
+              paddingTop: 2,
+            },
+          }}
+        >
+          <Tabs.Screen
+            name="inicio"
+            options={{
+              title: 'Inicio',
+              tabBarIcon: ({ color, focused }) => (
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name={
+                      focused
+                        ? 'home'
+                        : 'home-outline'
+                    }
+                    color={color}
+                    size={focused ? 30 : 25}
+                  />
 
-      <Tabs.Screen
-        name="busqueda"
-        options={{
-          title: 'Búsqueda',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name={focused ? 'search' : 'search-outline'}
-                color={color}
-                size={focused ? 30 : 25}
-              />
+                  {focused ? (
+                    <IndicadorActivo />
+                  ) : null}
+                </View>
+              ),
+            }}
+          />
 
-              {focused ? <IndicadorActivo /> : null}
-            </View>
-          ),
-        }}
-      />
+          <Tabs.Screen
+            name="busqueda"
+            options={{
+              title: 'Búsqueda',
+              tabBarIcon: ({ color, focused }) => (
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name={
+                      focused
+                        ? 'search'
+                        : 'search-outline'
+                    }
+                    color={color}
+                    size={focused ? 30 : 25}
+                  />
 
-      <Tabs.Screen
-        name="biblioteca"
-        options={{
-          title: 'Biblioteca',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name={
-                  focused
-                    ? 'musical-notes'
-                    : 'musical-notes-outline'
-                }
-                color={color}
-                size={focused ? 30 : 25}
-              />
+                  {focused ? (
+                    <IndicadorActivo />
+                  ) : null}
+                </View>
+              ),
+            }}
+          />
 
-              {focused ? <IndicadorActivo /> : null}
-            </View>
-          ),
-        }}
-      />
+          <Tabs.Screen
+            name="biblioteca"
+            options={{
+              title: 'Biblioteca',
+              tabBarIcon: ({ color, focused }) => (
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name={
+                      focused
+                        ? 'musical-notes'
+                        : 'musical-notes-outline'
+                    }
+                    color={color}
+                    size={focused ? 30 : 25}
+                  />
 
-      <Tabs.Screen
-        name="perfil"
-        options={{
-          title: 'Perfil',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name={focused ? 'person' : 'person-outline'}
-                color={color}
-                size={focused ? 30 : 25}
-              />
+                  {focused ? (
+                    <IndicadorActivo />
+                  ) : null}
+                </View>
+              ),
+            }}
+          />
 
-              {focused ? <IndicadorActivo /> : null}
-            </View>
-          ),
-        }}
-      />
-    </Tabs>
+          <Tabs.Screen
+            name="perfil"
+            options={{
+              title: 'Perfil',
+              tabBarIcon: ({ color, focused }) => (
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name={
+                      focused
+                        ? 'person'
+                        : 'person-outline'
+                    }
+                    color={color}
+                    size={focused ? 30 : 25}
+                  />
+
+                  {focused ? (
+                    <IndicadorActivo />
+                  ) : null}
+                </View>
+              ),
+            }}
+          />
+        </Tabs>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#020106',
+  },
+
+  tabsContainer: {
+    flex: 1,
+  },
+
   iconContainer: {
     width: 58,
     height: 39,

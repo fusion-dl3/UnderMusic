@@ -3,6 +3,10 @@ import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useState } from 'react';
 import {
+  CancionReproductor,
+  usePlayer,
+} from '@/context/PlayerContext';
+import {
   ActivityIndicator,
   Image,
   ImageBackground,
@@ -43,12 +47,31 @@ type PerfilArtista = {
   perfilCompleto: boolean;
 };
 
+type Cancion = {
+  id: string;
+  titulo: string;
+  album: string;
+  generoPrincipal: string;
+  generosSecundarios: string[];
+  audioId: string | null;
+  portadaId: string | null;
+  fechaPublicacion: string;
+  fechaActualizacion: string;
+};
+
 export default function PerfilScreen() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const {
+  cancionActual,
+  reproduciendo,
+  reproducirCancion,
+  alternarReproduccion,
+} = usePlayer();
 
   const [perfilArtista, setPerfilArtista] =
     useState<PerfilArtista | null>(null);
-
+  const [canciones, setCanciones] =
+    useState<Cancion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
@@ -119,8 +142,34 @@ export default function PerfilScreen() {
         setPerfilArtista(
           datosPerfilArtista.perfilArtista || null
         );
+                const respuestaCanciones = await fetch(
+          'http://192.168.1.14:3000/api/canciones/me',
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const datosCanciones =
+          await respuestaCanciones.json();
+
+        if (!respuestaCanciones.ok) {
+          setError(
+            datosCanciones.message ||
+              'No fue posible cargar tus canciones.'
+          );
+
+          return;
+        }
+
+        setCanciones(
+          datosCanciones.canciones || []
+        );
       } else {
         setPerfilArtista(null);
+        setCanciones([]);
       }
     } catch (error) {
       console.error('Error al cargar el perfil:', error);
@@ -443,25 +492,170 @@ export default function PerfilScreen() {
                     </Text>
                   </View>
 
-                  <View style={styles.emptySongsCard}>
-                    <View style={styles.emptySongsIcon}>
-                      <Ionicons
-                        name="musical-note-outline"
-                        size={32}
-                        color="#C487EE"
-                      />
+                  <Pressable
+  onPress={() => {
+    router.push('/publicar-cancion');
+  }}
+  style={({ pressed }) => [
+    styles.publishSongButton,
+    pressed && styles.buttonPressed,
+  ]}
+>
+  <Ionicons
+    name="add-circle-outline"
+    size={22}
+    color="#FFFFFF"
+  />
+
+  <Text style={styles.publishSongButtonText}>
+    Publicar canción
+  </Text>
+</Pressable>
+
+                              {canciones.length > 0 ? (
+                    <View style={styles.songsList}>
+                      {canciones.map((cancion) => (
+                        <View
+                          key={cancion.id}
+                          style={styles.songCard}
+                        >
+                          {cancion.portadaId ? (
+  <Image
+    source={{
+      uri: `http://192.168.1.14:3000/api/canciones/portadas/${cancion.portadaId}`,
+    }}
+    style={styles.songCover}
+    resizeMode="cover"
+  />
+) : usuario.fotoPerfil ? (
+  <Image
+    source={{
+      uri: `http://192.168.1.14:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
+    }}
+    style={styles.songCover}
+    resizeMode="cover"
+  />
+) : (
+  <View style={styles.songCoverPlaceholder}>
+    <Ionicons
+      name="musical-note"
+      size={28}
+      color="#D89BFF"
+    />
+  </View>
+)}
+
+                          <View style={styles.songInfo}>
+                            <Text
+                              style={styles.songTitle}
+                              numberOfLines={1}
+                            >
+                              {cancion.titulo}
+                            </Text>
+
+                            <Text
+                              style={styles.songGenre}
+                              numberOfLines={1}
+                            >
+                              {cancion.generoPrincipal}
+                            </Text>
+
+                            {cancion.album ? (
+                              <Text
+                                style={styles.songAlbum}
+                                numberOfLines={1}
+                              >
+                                {cancion.album}
+                              </Text>
+                            ) : null}
+                          </View>
+
+                          <Pressable
+  style={styles.songPlayButton}
+  disabled={!cancion.audioId}
+  onPress={() => {
+    if (!cancion.audioId) {
+      return;
+    }
+
+    const esCancionActual =
+      cancionActual?.id === cancion.id;
+
+    if (esCancionActual) {
+      alternarReproduccion();
+      return;
+    }
+
+    const colaReproductor:
+  CancionReproductor[] = canciones
+    .filter(
+      (item) => item.audioId !== null
+    )
+    .map((item) => ({
+      id: item.id,
+      audioId: item.audioId as string,
+      titulo: item.titulo,
+      nombreArtista:
+        perfilArtista?.nombreArtistico ||
+        usuario.nombreUsuario,
+      portadaId: item.portadaId,
+      fotoArtista:
+        usuario.fotoPerfil || null,
+    }));
+
+const cancionParaReproductor =
+  colaReproductor.find(
+    (item) => item.id === cancion.id
+  );
+
+if (!cancionParaReproductor) {
+  return;
+}
+
+reproducirCancion(
+  cancionParaReproductor,
+  colaReproductor
+);
+  }}
+>
+  <Ionicons
+    name={
+      cancionActual?.id === cancion.id &&
+      reproduciendo
+        ? 'pause'
+        : 'play'
+    }
+    size={19}
+    color={
+      cancion.audioId
+        ? '#FFFFFF'
+        : '#6E6876'
+    }
+  />
+</Pressable>
+                        </View>
+                      ))}
                     </View>
+                  ) : (
+                    <View style={styles.emptySongsCard}>
+                      <View style={styles.emptySongsIcon}>
+                        <Ionicons
+                          name="musical-note-outline"
+                          size={32}
+                          color="#C487EE"
+                        />
+                      </View>
 
-                    <Text style={styles.emptySongsTitle}>
-                      Aún no has publicado canciones
-                    </Text>
+                      <Text style={styles.emptySongsTitle}>
+                        Aún no has publicado canciones
+                      </Text>
 
-                    <Text style={styles.emptySongsDescription}>
-                      Tus canciones aparecerán aquí cuando
-                      comencemos a implementar la publicación de
-                      música.
-                    </Text>
-                  </View>
+                      <Text style={styles.emptySongsDescription}>
+                        Publica tu primera canción para que aparezca
+                        en tu perfil.
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
 
@@ -859,10 +1053,95 @@ const styles = StyleSheet.create({
     marginBottom: 27,
   },
 
+  publishSongButton: {
+  minHeight: 50,
+  marginTop: 16,
+  marginBottom: 16,
+  borderRadius: 15,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 9,
+  backgroundColor: '#7B3FC6',
+},
+
+publishSongButtonText: {
+  color: '#FFFFFF',
+  fontSize: 15,
+  fontWeight: '700',
+},
+
   songsSection: {
     width: '100%',
   },
+  songsList: {
+    width: '100%',
+    gap: 12,
+  },
 
+  songCard: {
+    width: '100%',
+    minHeight: 82,
+    padding: 12,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(12, 7, 28, 0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(137, 63, 209, 0.52)',
+  },
+
+  songCoverPlaceholder: {
+    width: 58,
+    height: 58,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(112, 48, 161, 0.22)',
+  },
+
+  songCover: {
+  width: 58,
+  height: 58,
+  borderRadius: 13,
+  backgroundColor: 'rgba(112, 48, 161, 0.22)',
+},
+
+songPlayButton: {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: 'rgba(137, 63, 209, 0.72)',
+  borderWidth: 1,
+  borderColor: 'rgba(214, 151, 255, 0.55)',
+},
+
+  songInfo: {
+    flex: 1,
+    marginLeft: 13,
+    marginRight: 8,
+  },
+
+  songTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+
+  songGenre: {
+    color: '#D49BFF',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+
+  songAlbum: {
+    color: '#918A9B',
+    fontSize: 12,
+    marginTop: 3,
+  },
   emptySongsCard: {
     width: '100%',
     alignItems: 'center',

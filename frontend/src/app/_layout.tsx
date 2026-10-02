@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { PlayerProvider } from '@/context/PlayerContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -11,14 +12,16 @@ export default function RootLayout() {
     <ThemeProvider value={DarkTheme}>
       <AnimatedSplashOverlay />
 
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: '#020106',
-          },
-        }}
-      />
+      <PlayerProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {
+              backgroundColor: '#020106',
+            },
+          }}
+        />
+      </PlayerProvider>
     </ThemeProvider>
   );
 }
