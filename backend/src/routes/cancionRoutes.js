@@ -4,6 +4,7 @@ const {
   publicarCancion,
   subirPortadaCancion,
   obtenerMisCanciones,
+  obtenerCancionesArtista,
   obtenerPortadaCancion,
   obtenerAudioCancion
 } = require('../controllers/cancionController');
@@ -29,6 +30,11 @@ router.get(
   '/me',
   verificarToken,
   obtenerMisCanciones
+);
+
+router.get(
+  '/artista/:usuarioId',
+  obtenerCancionesArtista
 );
 
 router.get(

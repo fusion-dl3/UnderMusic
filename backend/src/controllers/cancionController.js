@@ -649,6 +649,87 @@ async function obtenerMisCanciones(req, res) {
     });
   }
 }
+
+async function obtenerCancionesArtista(req, res) {
+  try {
+    const { usuarioId } = req.params;
+
+    if (!ObjectId.isValid(usuarioId)) {
+      return res.status(400).json({
+        message:
+          'El identificador del artista no es válido'
+      });
+    }
+
+    const artistaObjectId =
+      new ObjectId(usuarioId);
+
+    const perfilesArtista =
+      getPerfilesArtistaCollection();
+
+    const perfilArtista =
+      await perfilesArtista.findOne({
+        usuarioId: artistaObjectId,
+        perfilCompleto: true
+      });
+
+    if (!perfilArtista) {
+      return res.status(404).json({
+        message:
+          'El perfil artístico no está disponible'
+      });
+    }
+
+    const canciones =
+      getCancionesCollection();
+
+    const cancionesEncontradas =
+      await canciones
+        .find({
+          usuarioId: artistaObjectId
+        })
+        .sort({
+          fechaPublicacion: -1
+        })
+        .toArray();
+
+    const resultado =
+      cancionesEncontradas.map(
+        (cancion) => ({
+          id: cancion._id.toString(),
+          titulo: cancion.titulo,
+          album: cancion.album || '',
+          generoPrincipal:
+            cancion.generoPrincipal,
+          generosSecundarios:
+            cancion.generosSecundarios || [],
+          audioId:
+            cancion.audioId || null,
+          portadaId:
+            cancion.portadaId || null,
+          fechaPublicacion:
+            cancion.fechaPublicacion,
+          fechaActualizacion:
+            cancion.fechaActualizacion
+        })
+      );
+
+    return res.status(200).json({
+      canciones: resultado
+    });
+  } catch (error) {
+    console.error(
+      'Error al obtener canciones públicas del artista:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'No fue posible obtener las canciones'
+    });
+  }
+}
+
 async function obtenerPortadaCancion(req, res) {
   try {
     const { portadaId } = req.params;
@@ -835,6 +916,7 @@ module.exports = {
   publicarCancion,
   subirPortadaCancion,
   obtenerMisCanciones,
+  obtenerCancionesArtista,
   obtenerPortadaCancion,
   obtenerAudioCancion
 };

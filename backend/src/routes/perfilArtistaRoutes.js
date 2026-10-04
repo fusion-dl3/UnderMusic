@@ -2,7 +2,8 @@ const express = require('express');
 
 const {
   obtenerMiPerfilArtista,
-  actualizarMiPerfilArtista
+  actualizarMiPerfilArtista,
+  obtenerPerfilArtistaPublico
 } = require('../controllers/perfilArtistaController');
 
 const {
@@ -21,6 +22,11 @@ router.patch(
   '/me',
   verificarToken,
   actualizarMiPerfilArtista
+);
+
+router.get(
+  '/:usuarioId',
+  obtenerPerfilArtistaPublico
 );
 
 module.exports = router;

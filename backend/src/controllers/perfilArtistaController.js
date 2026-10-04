@@ -5,6 +5,10 @@ const {
 } = require('../models/perfilArtistaModel');
 
 const {
+  getUsuariosCollection
+} = require('../models/usuarioModel');
+
+const {
   GENEROS_MUSICALES
 } = require('../constants/generos');
 async function obtenerMiPerfilArtista(req, res) {
@@ -216,7 +220,108 @@ async function actualizarMiPerfilArtista(req, res) {
     });
   }
 }
+
+async function obtenerPerfilArtistaPublico(req, res) {
+  try {
+    const { usuarioId } = req.params;
+
+    if (!ObjectId.isValid(usuarioId)) {
+      return res.status(400).json({
+        message:
+          'El identificador del artista no es válido'
+      });
+    }
+
+    const usuarios =
+      getUsuariosCollection();
+
+    const perfilesArtista =
+      getPerfilesArtistaCollection();
+
+    const usuario = await usuarios.findOne({
+      _id: new ObjectId(usuarioId),
+      rol: 'artista'
+    });
+
+    if (!usuario) {
+      return res.status(404).json({
+        message:
+          'No se encontró el artista'
+      });
+    }
+
+    const perfilArtista =
+      await perfilesArtista.findOne({
+        usuarioId: usuario._id,
+        perfilCompleto: true
+      });
+
+    if (!perfilArtista) {
+      return res.status(404).json({
+        message:
+          'El perfil artístico no está disponible'
+      });
+    }
+
+    return res.status(200).json({
+      artista: {
+        usuarioId: usuario._id,
+
+        nombreUsuario:
+          usuario.nombreUsuario,
+
+        fotoPerfil:
+          usuario.fotoPerfil || null,
+
+        ubicacion: {
+          pais:
+            usuario.ubicacion?.pais || '',
+          region:
+            usuario.ubicacion?.region || '',
+          comuna:
+            usuario.ubicacion?.comuna || ''
+        },
+
+        nombreArtistico:
+          perfilArtista.nombreArtistico,
+
+        biografia:
+          perfilArtista.biografia,
+
+        generoPrincipal:
+          perfilArtista.generoPrincipal,
+
+        generosAdicionales:
+          perfilArtista.generosAdicionales || [],
+
+        correoContacto:
+          perfilArtista.correoContacto || '',
+
+        instagram:
+          perfilArtista.instagram || '',
+
+        facebook:
+          perfilArtista.facebook || '',
+
+        twitter:
+          perfilArtista.twitter || ''
+      }
+    });
+  } catch (error) {
+    console.error(
+      'Error al obtener perfil público de artista:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Error interno del servidor'
+    });
+  }
+}
+
 module.exports = {
   obtenerMiPerfilArtista,
-  actualizarMiPerfilArtista
+  actualizarMiPerfilArtista,
+  obtenerPerfilArtistaPublico
 };
