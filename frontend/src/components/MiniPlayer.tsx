@@ -18,6 +18,8 @@ export function MiniPlayer() {
     reproduciendo,
     progreso,
     alternarReproduccion,
+    reproducirAnterior,
+    reproducirSiguiente,
     cerrarReproductor,
   } = usePlayer();
 
@@ -73,37 +75,70 @@ export function MiniPlayer() {
           </Text>
         </View>
 
-        <Pressable
-          style={styles.playButton}
-          onPress={(event) => {
-            event.stopPropagation();
-            alternarReproduccion();
-          }}
-        >
-          <Ionicons
-            name={
-              reproduciendo
-                ? 'pause'
-                : 'play'
-            }
-            size={21}
-            color="#FFFFFF"
-          />
-        </Pressable>
-        <Pressable
-  style={styles.closeButton}
-  onPress={(event) => {
-    event.stopPropagation();
-    cerrarReproductor();
-  }}
-  hitSlop={8}
->
-  <Ionicons
-    name="close"
-    size={20}
-    color="#BDB6C5"
-  />
-</Pressable>
+        <View style={styles.controls}>
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={(event) => {
+              event.stopPropagation();
+              reproducirAnterior();
+            }}
+            hitSlop={4}
+          >
+            <Ionicons
+              name="play-skip-back"
+              size={18}
+              color="#FFFFFF"
+            />
+          </Pressable>
+
+          <Pressable
+            style={styles.playButton}
+            onPress={(event) => {
+              event.stopPropagation();
+              alternarReproduccion();
+            }}
+          >
+            <Ionicons
+              name={
+                reproduciendo
+                  ? 'pause'
+                  : 'play'
+              }
+              size={21}
+              color="#FFFFFF"
+            />
+          </Pressable>
+
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={(event) => {
+              event.stopPropagation();
+              reproducirSiguiente();
+            }}
+            hitSlop={4}
+          >
+            <Ionicons
+              name="play-skip-forward"
+              size={18}
+              color="#FFFFFF"
+            />
+          </Pressable>
+
+          <Pressable
+            style={styles.closeButton}
+            onPress={(event) => {
+              event.stopPropagation();
+              cerrarReproductor();
+            }}
+            hitSlop={8}
+          >
+            <Ionicons
+              name="close"
+              size={20}
+              color="#BDB6C5"
+            />
+          </Pressable>
+        </View>
       </Pressable>
 
       <View style={styles.progressTrack}>
@@ -125,12 +160,13 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: '#0C071C',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(168, 83, 232, 0.38)',
+    borderBottomColor:
+      'rgba(168, 83, 232, 0.38)',
   },
 
   content: {
     minHeight: 66,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
@@ -149,15 +185,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(112, 48, 161, 0.25)',
+    backgroundColor:
+      'rgba(112, 48, 161, 0.25)',
     borderWidth: 1,
-    borderColor: 'rgba(185, 103, 241, 0.35)',
+    borderColor:
+      'rgba(185, 103, 241, 0.35)',
   },
 
   info: {
     flex: 1,
-    marginLeft: 12,
-    marginRight: 10,
+    marginLeft: 10,
+    marginRight: 6,
   },
 
   title: {
@@ -173,29 +211,44 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+
+  secondaryButton: {
+    width: 32,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   playButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(137, 63, 209, 0.72)',
+    backgroundColor:
+      'rgba(137, 63, 209, 0.72)',
     borderWidth: 1,
-    borderColor: 'rgba(214, 151, 255, 0.48)',
+    borderColor:
+      'rgba(214, 151, 255, 0.48)',
   },
 
   closeButton: {
-  width: 34,
-  height: 40,
-  marginLeft: 5,
-  alignItems: 'center',
-  justifyContent: 'center',
-},
+    width: 30,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   progressTrack: {
     width: '100%',
     height: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor:
+      'rgba(255, 255, 255, 0.10)',
   },
 
   progressFill: {

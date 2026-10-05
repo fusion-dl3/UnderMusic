@@ -515,35 +515,46 @@ export default function PerfilScreen() {
                               {canciones.length > 0 ? (
                     <View style={styles.songsList}>
                       {canciones.map((cancion) => (
-                        <View
+                        <Pressable
                           key={cancion.id}
-                          style={styles.songCard}
+                          style={({ pressed }) => [
+                            styles.songCard,
+                            cancionActual?.id === cancion.id &&
+                              pressed &&
+                              styles.songCardPressed,
+                          ]}
+                          onPress={() => {
+
+  if (cancionActual?.id === cancion.id) {
+    router.push('/reproductor');
+  }
+}}
                         >
                           {cancion.portadaId ? (
-  <Image
-    source={{
-      uri: `http://192.168.1.14:3000/api/canciones/portadas/${cancion.portadaId}`,
-    }}
-    style={styles.songCover}
-    resizeMode="cover"
-  />
-) : usuario.fotoPerfil ? (
-  <Image
-    source={{
-      uri: `http://192.168.1.14:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
-    }}
-    style={styles.songCover}
-    resizeMode="cover"
-  />
-) : (
-  <View style={styles.songCoverPlaceholder}>
-    <Ionicons
-      name="musical-note"
-      size={28}
-      color="#D89BFF"
-    />
-  </View>
-)}
+                            <Image
+                              source={{
+                                uri: `http://192.168.1.14:3000/api/canciones/portadas/${cancion.portadaId}`,
+                              }}
+                              style={styles.songCover}
+                              resizeMode="cover"
+                            />
+                          ) : usuario.fotoPerfil ? (
+                            <Image
+                              source={{
+                                uri: `http://192.168.1.14:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
+                              }}
+                              style={styles.songCover}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={styles.songCoverPlaceholder}>
+                              <Ionicons
+                                name="musical-note"
+                                size={28}
+                                color="#D89BFF"
+                              />
+                            </View>
+                          )}
 
                           <View style={styles.songInfo}>
                             <Text
@@ -571,69 +582,71 @@ export default function PerfilScreen() {
                           </View>
 
                           <Pressable
-  style={styles.songPlayButton}
-  disabled={!cancion.audioId}
-  onPress={() => {
-    if (!cancion.audioId) {
-      return;
-    }
+                            style={styles.songPlayButton}
+                            disabled={!cancion.audioId}
+                            onPress={(event) => {
+                              event.stopPropagation();
 
-    const esCancionActual =
-      cancionActual?.id === cancion.id;
+                              if (!cancion.audioId) {
+                                return;
+                              }
 
-    if (esCancionActual) {
-      alternarReproduccion();
-      return;
-    }
+                              const esCancionActual =
+                                cancionActual?.id === cancion.id;
 
-    const colaReproductor:
-  CancionReproductor[] = canciones
-    .filter(
-      (item) => item.audioId !== null
-    )
-    .map((item) => ({
-      id: item.id,
-      audioId: item.audioId as string,
-      titulo: item.titulo,
-      nombreArtista:
-        perfilArtista?.nombreArtistico ||
-        usuario.nombreUsuario,
-      portadaId: item.portadaId,
-      fotoArtista:
-        usuario.fotoPerfil || null,
-    }));
+                              if (esCancionActual) {
+                                alternarReproduccion();
+                                return;
+                              }
 
-const cancionParaReproductor =
-  colaReproductor.find(
-    (item) => item.id === cancion.id
-  );
+                              const colaReproductor: CancionReproductor[] =
+                                canciones
+                                  .filter((item) => item.audioId !== null)
+                                  .map((item) => ({
+                                    id: item.id,
+                                    audioId: item.audioId as string,
+                                    titulo: item.titulo,
+                                    nombreArtista:
+                                      perfilArtista?.nombreArtistico ||
+                                      usuario.nombreUsuario,
+                                    portadaId: item.portadaId,
+                                    fotoArtista:
+                                      usuario.fotoPerfil || null,
+                                  }));
 
-if (!cancionParaReproductor) {
-  return;
-}
+                              const cancionParaReproductor =
+                                colaReproductor.find(
+                                  (item) => item.id === cancion.id
+                                );
 
-reproducirCancion(
-  cancionParaReproductor,
-  colaReproductor
-);
-  }}
->
-  <Ionicons
-    name={
-      cancionActual?.id === cancion.id &&
-      reproduciendo
-        ? 'pause'
-        : 'play'
-    }
-    size={19}
-    color={
-      cancion.audioId
-        ? '#FFFFFF'
-        : '#6E6876'
-    }
-  />
-</Pressable>
-                        </View>
+                              if (!cancionParaReproductor) {
+                                return;
+                              }
+
+                              reproducirCancion(
+                                cancionParaReproductor,
+                                colaReproductor
+                              );
+
+                              router.push('/reproductor');
+                            }}
+                          >
+                            <Ionicons
+                              name={
+                                cancionActual?.id === cancion.id &&
+                                reproduciendo
+                                  ? 'pause'
+                                  : 'play'
+                              }
+                              size={19}
+                              color={
+                                cancion.audioId
+                                  ? '#FFFFFF'
+                                  : '#6E6876'
+                              }
+                            />
+                          </Pressable>
+                        </Pressable>
                       ))}
                     </View>
                   ) : (
@@ -1089,6 +1102,10 @@ publishSongButtonText: {
     backgroundColor: 'rgba(12, 7, 28, 0.78)',
     borderWidth: 1,
     borderColor: 'rgba(137, 63, 209, 0.52)',
+  },
+
+  songCardPressed: {
+    opacity: 0.82,
   },
 
   songCoverPlaceholder: {
