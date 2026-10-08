@@ -11,6 +11,49 @@ const {
 const {
   GENEROS_MUSICALES
 } = require('../constants/generos');
+function validarContacto(campo, valor) {
+  const texto = valor.trim();
+  if (!texto) return '';
+  if (campo === 'correoContacto') {
+    return /^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/.test(texto) && texto.length <= 254
+      ? '' : 'Ingresa un correo electrónico con formato válido.';
+  }
+  if (texto.length > 500 || !/^https:\/\//i.test(texto)) {
+    return 'Pega la URL completa que comienza con https://';
+  }
+  try {
+    const url = new URL(texto);
+    if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash) {
+      return 'Ingresa un enlace HTTPS válido del perfil.';
+    }
+    const dominio = url.hostname.toLowerCase();
+    const segmentos = url.pathname.split('/').filter(Boolean);
+    const usuarioValido = (nombre) => /^[a-zA-Z0-9._-]{1,100}$/.test(nombre);
+    if (campo === 'instagram') {
+      if (!['instagram.com', 'www.instagram.com'].includes(dominio) ||
+          segmentos.length !== 1 || !/^[a-zA-Z0-9._]{1,30}$/.test(segmentos[0]) ||
+          ['p', 'reel', 'reels', 'stories', 'explore', 'direct', 'accounts'].includes(segmentos[0].toLowerCase())) {
+        return 'Pega una URL de perfil de Instagram, por ejemplo https://www.instagram.com/usuario/';
+      }
+    } else if (campo === 'facebook') {
+      if (!['facebook.com', 'www.facebook.com', 'm.facebook.com', 'fb.com', 'www.fb.com'].includes(dominio) ||
+          !((segmentos.length === 1 && segmentos[0].toLowerCase() === 'profile.php' && /^\d+$/.test(url.searchParams.get('id') || '')) ||
+            (segmentos.length === 1 && usuarioValido(segmentos[0]) && !['watch', 'reel', 'reels', 'share', 'groups', 'events', 'marketplace'].includes(segmentos[0].toLowerCase())))) {
+        return 'Pega una URL de perfil o página de Facebook.';
+      }
+    } else if (campo === 'twitter') {
+      if (!['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'].includes(dominio) ||
+          segmentos.length !== 1 || !/^[a-zA-Z0-9_]{1,15}$/.test(segmentos[0]) ||
+          ['home', 'explore', 'search', 'settings', 'messages', 'notifications', 'compose'].includes(segmentos[0].toLowerCase())) {
+        return 'Pega una URL de perfil de X (Twitter), por ejemplo https://x.com/usuario';
+      }
+    }
+    return '';
+  } catch {
+    return 'La URL ingresada no es válida.';
+  }
+}
+
 async function obtenerMiPerfilArtista(req, res) {
   try {
     if (req.usuario.rol !== 'artista') {
@@ -151,6 +194,14 @@ async function actualizarMiPerfilArtista(req, res) {
         message:
           'El género principal no puede repetirse como género adicional'
       });
+    }
+
+    const contactos = { correoContacto, instagram, facebook, twitter };
+    for (const [campo, valor] of Object.entries(contactos)) {
+      const errorContacto = validarContacto(campo, valor);
+      if (errorContacto) {
+        return res.status(400).json({ message: errorContacto, campo });
+      }
     }
 
     const perfilCompleto = Boolean(

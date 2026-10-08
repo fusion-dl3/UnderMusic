@@ -72,6 +72,7 @@ export default function PerfilScreen() {
     useState<PerfilArtista | null>(null);
   const [canciones, setCanciones] =
     useState<Cancion[]>([]);
+  const [cantidadSeguidores, setCantidadSeguidores] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
@@ -85,6 +86,7 @@ export default function PerfilScreen() {
     try {
       setCargando(true);
       setError('');
+      setCantidadSeguidores(null);
 
       const token = await SecureStore.getItemAsync('token');
 
@@ -142,6 +144,34 @@ export default function PerfilScreen() {
         setPerfilArtista(
           datosPerfilArtista.perfilArtista || null
         );
+
+        // El mismo endpoint que utiliza el perfil público para el contador.
+        // Si falla, no interrumpimos la carga del perfil ni de las canciones.
+        try {
+          const respuestaSeguidores = await fetch(
+            `http://192.168.1.14:3000/api/seguimientos/artistas/${usuarioCargado.id}/estado`,
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (respuestaSeguidores.ok) {
+            const datosSeguidores = await respuestaSeguidores.json();
+            if (
+              typeof datosSeguidores.cantidadSeguidores === 'number' &&
+              Number.isFinite(datosSeguidores.cantidadSeguidores)
+            ) {
+              setCantidadSeguidores(datosSeguidores.cantidadSeguidores);
+            }
+          } else {
+            console.warn('No fue posible cargar el contador de seguidores.');
+          }
+        } catch (errorSeguidores) {
+          console.warn('Error al consultar seguidores:', errorSeguidores);
+        }
                 const respuestaCanciones = await fetch(
           'http://192.168.1.14:3000/api/canciones/me',
           {
@@ -169,6 +199,7 @@ export default function PerfilScreen() {
         );
       } else {
         setPerfilArtista(null);
+        setCantidadSeguidores(null);
         setCanciones([]);
       }
     } catch (error) {
@@ -294,25 +325,49 @@ export default function PerfilScreen() {
               </Text>
             )}
 
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleText}>
-                {esArtista ? 'ARTISTA' : 'OYENTE'}
-              </Text>
+            <View style={styles.roleAndCountryRow}>
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleText}>
+                  {esArtista ? 'ARTISTA' : 'OYENTE'}
+                </Text>
+              </View>
+              {esArtista && usuario.ubicacion?.pais ? (
+                <Text style={styles.countryText}>{usuario.ubicacion.pais}</Text>
+              ) : null}
             </View>
 
-            <View style={styles.locationRow}>
-              <Ionicons
-                name="location-outline"
-                size={27}
-                color="#54E6FF"
-              />
+            <View style={styles.profileStatsRow}>
+              <View style={styles.locationRow}>
+                <Ionicons name="location-outline" size={24} color="#54E6FF" />
+                <Text style={styles.locationText}>
+                  {usuario.ubicacion.comuna}, {usuario.ubicacion.region}
+                </Text>
+              </View>
 
-              <Text style={styles.locationText}>
-                {usuario.ubicacion.comuna},{' '}
-                {usuario.ubicacion.region}
-              </Text>
+              {esArtista && cantidadSeguidores !== null ? (
+                <View style={styles.followersContainer}>
+                  <Ionicons name="people-outline" size={23} color="#D66BFF" />
+                  <Text style={styles.followersLabel}>
+                    {cantidadSeguidores}{' '}
+                    {cantidadSeguidores === 1 ? 'seguidor' : 'seguidores'}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
+
+          {esArtista && perfilArtista ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ver mi perfil público"
+              onPress={() => router.push({ pathname: '/artista/[usuarioId]', params: { usuarioId: usuario.id, vistaPrevia: '1' } })}
+              style={({ pressed }) => [styles.previewProfileButton, pressed && styles.buttonPressed]}
+            >
+              <Ionicons name="eye-outline" size={22} color="#EAC6FF" />
+              <Text style={styles.previewProfileButtonText}>Ver mi perfil público</Text>
+              <Ionicons name="chevron-forward" size={20} color="#D59AFF" />
+            </Pressable>
+          ) : null}
 
           {esArtista ? (
             <>
@@ -892,8 +947,16 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 
-  roleBadge: {
+  roleAndCountryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
     marginTop: 10,
+  },
+
+  roleBadge: {
     paddingHorizontal: 18,
     paddingVertical: 7,
     borderRadius: 20,
@@ -909,20 +972,56 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
 
+  countryText: {
+    color: '#D7D1DE',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  profileStatsRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    columnGap: 24,
+    rowGap: 14,
+    maxWidth: 550,
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    marginTop: 22,
+  },
+
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 22,
-    paddingHorizontal: 15,
+    flexShrink: 1,
+    minWidth: 0,
+    gap: 8,
   },
 
   locationText: {
     flexShrink: 1,
     color: '#D7D1DE',
-    fontSize: 17,
-    marginLeft: 8,
-    textAlign: 'center',
+    fontSize: 15,
+    lineHeight: 21,
+    textAlign: 'left',
+  },
+
+  followersContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    flexShrink: 0,
+    marginRight: 8,
+  },
+
+  followersLabel: {
+    color: '#E5C6F5',
+    fontSize: 15,
+    fontWeight: '600',
   },
 
   artistContent: {
@@ -1035,6 +1134,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 5,
+  },
+
+  previewProfileButton: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    marginTop: 24,
+    minHeight: 54,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(79, 32, 124, 0.76)',
+    borderWidth: 1,
+    borderColor: '#B77CFF',
+  },
+  previewProfileButtonText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 
   artistProfileButton: {

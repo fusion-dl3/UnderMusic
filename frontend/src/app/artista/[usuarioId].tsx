@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { MiniPlayer } from '@/components/MiniPlayer';
+import * as SecureStore from 'expo-secure-store';
 import {
   router,
   useFocusEffect,
@@ -8,6 +9,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -18,8 +20,11 @@ import {
 
 import {
   ActivityIndicator,
+  Alert,
   Image,
   ImageBackground,
+  Linking,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,7 +32,7 @@ import {
   View,
 } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const API_URL = 'http://192.168.1.14:3000';
 
@@ -63,9 +68,32 @@ type Cancion = {
 };
 
 export default function PerfilArtistaPublicoScreen() {
-  const { usuarioId } = useLocalSearchParams<{
+  const insets = useSafeAreaInsets();
+  const [avisoSeguimiento, setAvisoSeguimiento] = useState<{ mensaje: string; siguiendo: boolean } | null>(null);
+  const temporizadorAviso = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (temporizadorAviso.current) clearTimeout(temporizadorAviso.current);
+    };
+  }, []);
+
+  const mostrarAvisoSeguimiento = (nuevoEstado: boolean) => {
+    if (temporizadorAviso.current) clearTimeout(temporizadorAviso.current);
+    setAvisoSeguimiento({
+      mensaje: `${nuevoEstado ? 'Comenzaste a seguir a' : 'Dejaste de seguir a'} ${artista?.nombreArtistico || 'este artista'}`,
+      siguiendo: nuevoEstado,
+    });
+    temporizadorAviso.current = setTimeout(() => {
+      setAvisoSeguimiento(null);
+      temporizadorAviso.current = null;
+    }, 5000);
+  };
+  const { usuarioId, vistaPrevia } = useLocalSearchParams<{
     usuarioId: string;
+    vistaPrevia?: string;
   }>();
+  const esVistaPrevia = vistaPrevia === '1';
 
   const {
     cancionActual,
@@ -86,6 +114,14 @@ export default function PerfilArtistaPublicoScreen() {
   const [error, setError] =
     useState('');
 
+  const [siguiendo, setSiguiendo] = useState(false);
+  const [cantidadSeguidores, setCantidadSeguidores] = useState<number | null>(null);
+  const [cargandoSeguimiento, setCargandoSeguimiento] = useState(true);
+  const [procesandoSeguimiento, setProcesandoSeguimiento] = useState(false);
+  const [errorSeguimiento, setErrorSeguimiento] = useState('');
+  const [contactoVisible, setContactoVisible] = useState(false);
+  const [avisoAutoSeguimientoVisible, setAvisoAutoSeguimientoVisible] = useState(false);
+
     const [abriendoReproductor, setAbriendoReproductor] =
   useState(false);
 
@@ -105,7 +141,73 @@ export default function PerfilArtistaPublicoScreen() {
     }
 
     cargarPerfilPublico();
+    cargarEstadoSeguimiento();
   }, [usuarioId]);
+
+  const cargarEstadoSeguimiento = async () => {
+    try {
+      setCargandoSeguimiento(true);
+      setErrorSeguimiento('');
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) {
+        setErrorSeguimiento('Inicia sesión para seguir artistas.');
+        return;
+      }
+      const respuesta = await fetch(
+        `${API_URL}/api/seguimientos/artistas/${usuarioId}/estado`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const datos = await respuesta.json();
+      if (!respuesta.ok) {
+        throw new Error(datos.message || 'No se pudo consultar el seguimiento.');
+      }
+      setSiguiendo(datos.siguiendo === true);
+      setCantidadSeguidores(datos.cantidadSeguidores);
+    } catch (err) {
+      setErrorSeguimiento(err instanceof Error ? err.message : 'Error de conexión.');
+    } finally {
+      setCargandoSeguimiento(false);
+    }
+  };
+
+  const alternarSeguimiento = async () => {
+    if (esVistaPrevia || !usuarioId || cargandoSeguimiento || procesandoSeguimiento || errorSeguimiento) return;
+    setProcesandoSeguimiento(true);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) {
+        Alert.alert('Sesión', 'Inicia sesión para seguir artistas.');
+        return;
+      }
+      const respuesta = await fetch(
+        `${API_URL}/api/seguimientos/artistas/${usuarioId}`,
+        {
+          method: siguiendo ? 'DELETE' : 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const datos = await respuesta.json();
+      if (!respuesta.ok) {
+        throw new Error(datos.message || 'No se pudo actualizar el seguimiento.');
+      }
+      setSiguiendo(datos.siguiendo === true);
+      mostrarAvisoSeguimiento(datos.siguiendo === true);
+      if (typeof datos.cantidadSeguidores === 'number') {
+        setCantidadSeguidores(datos.cantidadSeguidores);
+      } else {
+        await cargarEstadoSeguimiento();
+      }
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : 'Error de conexión.';
+      if (/no puedes seguirte a ti mismo|no puede seguirse a s[ií] mismo|no puedes seguir tu propia cuenta/i.test(mensaje)) {
+        setAvisoAutoSeguimientoVisible(true);
+      } else {
+        Alert.alert('Seguimiento', mensaje);
+      }
+    } finally {
+      setProcesandoSeguimiento(false);
+    }
+  };
 
   const cargarPerfilPublico = async () => {
     try {
@@ -164,10 +266,54 @@ export default function PerfilArtistaPublicoScreen() {
     }
   };
 
+  // No se muestra el correo privado de registro: solo correoContacto.
+  const contactoOpciones: {
+    clave: string;
+    titulo: string;
+    detalle: string;
+    url: string;
+    icono: keyof typeof Ionicons.glyphMap;
+  }[] = [];
+
+  const correo = artista?.correoContacto?.trim() || '';
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+    contactoOpciones.push({
+      clave: 'correo', titulo: 'Correo electrónico', detalle: correo,
+      url: `mailto:${correo}`, icono: 'mail-outline',
+    });
+  }
+
+  const redes = [
+    { clave: 'instagram', titulo: 'Instagram', valor: artista?.instagram, dominios: ['instagram.com'], icono: 'logo-instagram' },
+    { clave: 'facebook', titulo: 'Facebook', valor: artista?.facebook, dominios: ['facebook.com', 'fb.com'], icono: 'logo-facebook' },
+    { clave: 'twitter', titulo: 'X', valor: artista?.twitter, dominios: ['x.com', 'twitter.com'], icono: 'logo-twitter' },
+  ] as const;
+  redes.forEach((red) => {
+    const valor = red.valor?.trim();
+    if (!valor) return;
+    try {
+      const url = new URL(valor);
+      const host = url.hostname.toLowerCase();
+      if (url.protocol !== 'https:' || !red.dominios.some((d) => host === d || host === `www.${d}`) || url.username || url.password || url.pathname === '/') return;
+      contactoOpciones.push({
+        clave: red.clave, titulo: red.titulo, detalle: valor,
+        url: valor, icono: red.icono,
+      });
+    } catch { /* Enlaces inválidos no se muestran. */ }
+  });
+
+  const abrirContacto = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('No se pudo abrir', 'No encontramos una aplicación compatible para abrir este contacto.');
+    }
+  };
+
   const reproducir = (
     cancion: Cancion
   ) => {
-    if (!cancion.audioId || !artista) {
+    if (esVistaPrevia || !cancion.audioId || !artista) {
       return;
     }
 
@@ -283,7 +429,7 @@ router.push('/reproductor');
   style={styles.safeArea}
   edges={[]}
 >
-  {!abriendoReproductor ? (
+  {!esVistaPrevia && !abriendoReproductor ? (
     <MiniPlayer />
   ) : null}
 
@@ -312,7 +458,7 @@ router.push('/reproductor');
       </Pressable>
 
       <Text style={styles.headerTitle}>
-        Perfil del artista
+        {esVistaPrevia ? 'Vista previa de tu perfil' : 'Perfil del artista'}
       </Text>
 
       <View style={styles.headerSpacer} />
@@ -361,31 +507,78 @@ router.push('/reproductor');
               @{artista.nombreUsuario}
             </Text>
 
-            <View
-              style={styles.roleBadge}
-            >
-              <Text
-                style={styles.roleText}
-              >
-                ARTISTA
-              </Text>
+            <View style={styles.roleCountryRow}>
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleText}>ARTISTA</Text>
+              </View>
+              {!!artista.ubicacion?.pais && (
+                <Text style={styles.countryText}>{artista.ubicacion.pais}</Text>
+              )}
             </View>
 
-            <View
-              style={styles.locationRow}
-            >
-              <Ionicons
-                name="location-outline"
-                size={27}
-                color="#54E6FF"
-              />
+            <View style={styles.profileStatsRow}>
+              <View style={styles.locationRow}>
+                <Ionicons name="location-outline" size={22} color="#54E6FF" />
+                <Text style={styles.locationText}>
+                  {artista.ubicacion.comuna}, {artista.ubicacion.region}
+                </Text>
+              </View>
+              <View style={styles.followersRow}>
+                <Ionicons name="people-outline" size={21} color="#E05BFF" />
+                <Text style={styles.followCount}>
+                  {cantidadSeguidores === null ? '—' : cantidadSeguidores}{' '}
+                  {cantidadSeguidores === 1 ? 'seguidor' : 'seguidores'}
+                </Text>
+              </View>
+            </View>
 
-              <Text
-                style={styles.locationText}
+            {esVistaPrevia ? (
+              <View style={styles.previewNotice}>
+                <Ionicons name="eye-outline" size={18} color="#EAC6FF" />
+                <Text style={styles.previewNoticeText}>
+                  Así ven tu perfil los oyentes. Seguir y reproducir están desactivados en esta vista.
+                </Text>
+              </View>
+            ) : null}
+            <View style={styles.profileActionsRow}>
+              {esVistaPrevia ? (
+                <View style={[styles.followButton, styles.followButtonActive, styles.previewDisabled]}>
+                  <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.followButtonText}>Seguir</Text>
+                </View>
+              ) : errorSeguimiento ? (
+                <Pressable onPress={cargarEstadoSeguimiento} style={styles.followButton}>
+                  <Text style={styles.followButtonText}>Reintentar</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={alternarSeguimiento}
+                  disabled={cargandoSeguimiento || procesandoSeguimiento}
+                  style={({ pressed }) => [
+                    styles.followButton,
+                    siguiendo && styles.followButtonActive,
+                    (pressed || cargandoSeguimiento || procesandoSeguimiento) && styles.buttonPressed,
+                  ]}
+                >
+                  {cargandoSeguimiento || procesandoSeguimiento ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Ionicons name={siguiendo ? 'checkmark' : 'person-add-outline'} size={20} color="#FFFFFF" />
+                  )}
+                  <Text style={styles.followButtonText}>
+                    {cargandoSeguimiento ? 'Consultando...' : procesandoSeguimiento ? 'Actualizando...' : siguiendo ? 'Siguiendo' : 'Seguir'}
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable
+                onPress={() => setContactoVisible(true)}
+                style={({ pressed }) => [styles.contactButton, pressed && styles.buttonPressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Contactar al artista"
               >
-                {artista.ubicacion.comuna},{' '}
-                {artista.ubicacion.region}
-              </Text>
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.contactButtonText}>Contactar</Text>
+              </Pressable>
             </View>
           </View>
 
@@ -549,7 +742,7 @@ router.push('/reproductor');
       styles.songCardPressed,
   ]}
   onPress={() => {
-    if (cancionActual?.id === cancion.id) {
+    if (!esVistaPrevia && cancionActual?.id === cancion.id) {
       router.push('/reproductor');
     }
   }}
@@ -638,7 +831,7 @@ router.push('/reproductor');
                             styles.songPlayButton
                           }
                           disabled={
-                            !cancion.audioId
+                            esVistaPrevia || !cancion.audioId
                           }
                           onPress={() =>
                             reproducir(
@@ -709,11 +902,276 @@ router.push('/reproductor');
           </View>
         </ScrollView>
       </SafeAreaView>
+       <Modal
+         visible={contactoVisible}
+         transparent
+         animationType="slide"
+         onRequestClose={() => setContactoVisible(false)}
+       >
+         <View style={styles.contactModalRoot}>
+           <Pressable
+             style={styles.contactBackdrop}
+             onPress={() => setContactoVisible(false)}
+             accessibilityLabel="Cerrar contactos"
+           />
+           <View style={[styles.contactSheet, { paddingBottom: Math.max(insets.bottom, 22) }]}>
+             <View style={styles.contactSheetHeader}>
+               <View style={{ flex: 1 }}>
+                 <Text style={styles.contactSheetTitle}>Contactar</Text>
+                 <Text style={styles.contactSheetSubtitle}>
+                   {artista.nombreArtistico || artista.nombreUsuario}
+                 </Text>
+               </View>
+               <Pressable onPress={() => setContactoVisible(false)} accessibilityLabel="Cerrar">
+                 <Ionicons name="close-circle-outline" size={30} color="#E9B5FF" />
+               </Pressable>
+             </View>
+             {contactoOpciones.length === 0 ? (
+               <Text style={styles.contactEmpty}>
+                 Este artista aún no ha agregado métodos de contacto.
+               </Text>
+             ) : (
+               contactoOpciones.map((opcion) => (
+                 <Pressable
+                   key={opcion.clave}
+                   onPress={() => abrirContacto(opcion.url)}
+                   style={({ pressed }) => [styles.contactOption, pressed && styles.buttonPressed]}
+                   accessibilityRole="button"
+                 >
+                   <Ionicons name={opcion.icono} size={25} color="#FF65BE" />
+                   <View style={{ flex: 1 }}>
+                     <Text style={styles.contactOptionTitle}>{opcion.titulo}</Text>
+                     <Text style={styles.contactOptionDetail} numberOfLines={2}>
+                       {opcion.detalle}
+                     </Text>
+                   </View>
+                   <Ionicons name="open-outline" size={20} color="#D6A5F3" />
+                 </Pressable>
+               ))
+             )}
+          </View>
+         </View>
+       </Modal>
+       <Modal
+         visible={avisoAutoSeguimientoVisible}
+         transparent
+         animationType="fade"
+         statusBarTranslucent
+         onRequestClose={() => setAvisoAutoSeguimientoVisible(false)}
+       >
+         <View style={styles.selfFollowModalRoot}>
+           <Pressable
+             style={styles.selfFollowBackdrop}
+             onPress={() => setAvisoAutoSeguimientoVisible(false)}
+             accessibilityLabel="Cerrar aviso"
+           />
+           <View style={styles.selfFollowCard}>
+             <View style={styles.selfFollowIconCircle}>
+               <Ionicons name="person-remove-outline" size={32} color="#FF79BC" />
+             </View>
+             <Text style={styles.selfFollowTitle}>No puedes seguirte a ti mismo</Text>
+             <Text style={styles.selfFollowDescription}>
+               Puedes explorar tu perfil y escuchar tus canciones, pero no seguir tu propia cuenta.
+             </Text>
+             <Pressable
+               onPress={() => setAvisoAutoSeguimientoVisible(false)}
+               style={({ pressed }) => [styles.selfFollowAcceptButton, pressed && styles.buttonPressed]}
+               accessibilityRole="button"
+             >
+               <Text style={styles.selfFollowAcceptText}>Entendido</Text>
+             </Pressable>
+           </View>
+         </View>
+       </Modal>
+       {avisoSeguimiento ? (
+        <View pointerEvents="box-none" style={[styles.toastLayer, { top: insets.top + 12 }]}>
+          <View style={styles.toastCard}>
+            <View style={styles.toastIcon}>
+              <Ionicons
+                name={avisoSeguimiento.siguiendo ? 'person-add' : 'person-remove'}
+                size={24}
+                color="#FFFFFF"
+              />
+            </View>
+            <Text style={styles.toastText}>{avisoSeguimiento.mensaje}</Text>
+            <Pressable
+              onPress={() => {
+                if (temporizadorAviso.current) clearTimeout(temporizadorAviso.current);
+                temporizadorAviso.current = null;
+                setAvisoSeguimiento(null);
+              }}
+              hitSlop={10}
+              accessibilityLabel="Cerrar notificación"
+            >
+              <Ionicons name="close" size={22} color="#F7C0DF" />
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
     </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  selfFollowModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 26,
+  },
+  selfFollowBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.78)',
+  },
+  selfFollowCard: {
+    width: '100%',
+    maxWidth: 400,
+    paddingHorizontal: 25,
+    paddingTop: 28,
+    paddingBottom: 24,
+    alignItems: 'center',
+    borderRadius: 26,
+    backgroundColor: '#160B28',
+    borderWidth: 1.5,
+    borderColor: '#BA4EE4',
+  },
+  selfFollowIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(161, 49, 135, 0.26)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  selfFollowTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  selfFollowDescription: {
+    color: '#C9BED5',
+    fontSize: 15,
+    lineHeight: 23,
+    textAlign: 'center',
+    marginBottom: 25,
+  },
+  selfFollowAcceptButton: {
+    width: '100%',
+    minHeight: 48,
+    borderRadius: 24,
+    backgroundColor: '#812CC1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#C875F5',
+  },
+  selfFollowAcceptText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  contactButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    paddingHorizontal: 10,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: '#AD237E',
+    borderWidth: 1,
+    borderColor: '#FF73C7',
+  },
+  contactButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  contactModalRoot: { flex: 1, justifyContent: 'flex-end' },
+  previewNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginTop: 18,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(183, 124, 255, 0.6)',
+    backgroundColor: 'rgba(62, 25, 98, 0.65)',
+  },
+  previewNoticeText: {
+    flex: 1,
+    color: '#E9D8F6',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  previewDisabled: { opacity: 0.55 },
+  contactBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.72)' },
+  contactSheet: {
+    backgroundColor: '#150B25',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderColor: '#C542A0',
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    maxHeight: '85%',
+  },
+  contactSheetHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  contactSheetTitle: { color: '#FFFFFF', fontSize: 23, fontWeight: '800' },
+  contactSheetSubtitle: { color: '#C6A6D5', fontSize: 14, marginTop: 4 },
+  contactEmpty: { color: '#D8C9DF', fontSize: 15, lineHeight: 23, textAlign: 'center', paddingVertical: 28 },
+  contactOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 14, paddingHorizontal: 15, marginBottom: 11,
+    borderRadius: 17, backgroundColor: 'rgba(83, 24, 85, 0.46)',
+    borderWidth: 1, borderColor: 'rgba(239, 89, 180, 0.45)',
+  },
+  contactOptionTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  contactOptionDetail: { color: '#CDB9D4', fontSize: 12, marginTop: 4 },
+  toastLayer: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 100,
+    elevation: 20,
+    alignItems: 'center',
+  },
+  toastCard: {
+    width: '100%',
+    maxWidth: 600,
+    minHeight: 76,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 22,
+    backgroundColor: '#380A29',
+    borderWidth: 2,
+    borderColor: '#FF299B',
+    shadowColor: '#FF168B',
+    shadowOpacity: 0.65,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  toastIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#FF168B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toastText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 21,
+  },
   background: {
     flex: 1,
     backgroundColor: '#020106',
@@ -840,20 +1298,87 @@ header: {
     letterSpacing: 1.2,
   },
 
+  roleCountryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 13,
+  },
+  countryText: {
+    color: '#C7BFCE',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 10,
+  },
+  profileStatsRow: {
+    width: '100%',
+    maxWidth: 540,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    columnGap: 22,
+    rowGap: 10,
+    marginTop: 22,
+    paddingHorizontal: 8,
+  },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 22,
-    paddingHorizontal: 15,
+    flexShrink: 1,
+    maxWidth: '100%',
   },
-
   locationText: {
     flexShrink: 1,
     color: '#D7D1DE',
-    fontSize: 17,
-    marginLeft: 8,
+    fontSize: 15,
+    marginLeft: 6,
     textAlign: 'center',
+  },
+  followersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  followCount: {
+    color: '#D7CBE5',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  profileActionsRow: {
+    width: '100%',
+    maxWidth: 440,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 18,
+  },
+  followButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    paddingHorizontal: 10,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: '#8538D4',
+    borderWidth: 1,
+    borderColor: '#CB8DFF',
+  },
+
+  followButtonActive: {
+    backgroundColor: 'rgba(59, 31, 82, 0.90)',
+  },
+
+  followButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
 
   artistContent: {

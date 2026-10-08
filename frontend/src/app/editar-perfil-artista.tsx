@@ -36,6 +36,49 @@ type PerfilArtista = {
   perfilCompleto: boolean;
 };
 
+function validarContacto(campo: 'correoContacto' | 'instagram' | 'facebook' | 'twitter', valor: string): string {
+  const texto = valor.trim();
+  if (!texto) return '';
+  if (campo === 'correoContacto') {
+    return /^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/.test(texto) && texto.length <= 254
+      ? '' : 'Ingresa un correo electrónico con formato válido.';
+  }
+  if (texto.length > 500 || !/^https:\/\//i.test(texto)) {
+    return 'Pega la URL completa que comienza con https://';
+  }
+  try {
+    const url = new URL(texto);
+    if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash) {
+      return 'Ingresa un enlace HTTPS válido del perfil.';
+    }
+    const dominio = url.hostname.toLowerCase();
+    const segmentos = url.pathname.split('/').filter(Boolean);
+    const usuarioValido = (nombre: string) => /^[a-zA-Z0-9._-]{1,100}$/.test(nombre);
+    if (campo === 'instagram') {
+      if (!['instagram.com', 'www.instagram.com'].includes(dominio) ||
+          segmentos.length !== 1 || !/^[a-zA-Z0-9._]{1,30}$/.test(segmentos[0]) ||
+          ['p', 'reel', 'reels', 'stories', 'explore', 'direct', 'accounts'].includes(segmentos[0].toLowerCase())) {
+        return 'Pega una URL de perfil de Instagram, por ejemplo https://www.instagram.com/usuario/';
+      }
+    } else if (campo === 'facebook') {
+      if (!['facebook.com', 'www.facebook.com', 'm.facebook.com', 'fb.com', 'www.fb.com'].includes(dominio) ||
+          !((segmentos.length === 1 && segmentos[0].toLowerCase() === 'profile.php' && /^\d+$/.test(url.searchParams.get('id') || '')) ||
+            (segmentos.length === 1 && usuarioValido(segmentos[0]) && !['watch', 'reel', 'reels', 'share', 'groups', 'events', 'marketplace'].includes(segmentos[0].toLowerCase())))) {
+        return 'Pega una URL de perfil o página de Facebook.';
+      }
+    } else if (campo === 'twitter') {
+      if (!['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'].includes(dominio) ||
+          segmentos.length !== 1 || !/^[a-zA-Z0-9_]{1,15}$/.test(segmentos[0]) ||
+          ['home', 'explore', 'search', 'settings', 'messages', 'notifications', 'compose'].includes(segmentos[0].toLowerCase())) {
+        return 'Pega una URL de perfil de X (Twitter), por ejemplo https://x.com/usuario';
+      }
+    }
+    return '';
+  } catch {
+    return 'La URL ingresada no es válida.';
+  }
+}
+
 export default function EditarPerfilArtistaScreen() {
   const [perfilArtistaOriginal, setPerfilArtistaOriginal] =
     useState<PerfilArtista | null>(null);
@@ -50,6 +93,8 @@ export default function EditarPerfilArtistaScreen() {
   const [instagram, setInstagram] = useState('');
   const [facebook, setFacebook] = useState('');
   const [twitter, setTwitter] = useState('');
+  const [contactosVisitados, setContactosVisitados] = useState<string[]>([]);
+  const [validacionIntentada, setValidacionIntentada] = useState(false);
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -261,8 +306,25 @@ export default function EditarPerfilArtistaScreen() {
     });
   };
 
+  const erroresContacto = {
+    correoContacto: validarContacto('correoContacto', correoContacto),
+    instagram: validarContacto('instagram', instagram),
+    facebook: validarContacto('facebook', facebook),
+    twitter: validarContacto('twitter', twitter),
+  };
+
+  const mostrarErrorContacto = (campo: keyof typeof erroresContacto) =>
+    (validacionIntentada || contactosVisitados.includes(campo)) && !!erroresContacto[campo];
+
   const guardarPerfilArtista = async () => {
     if (!hayCambios || guardando) {
+      return;
+    }
+
+    setValidacionIntentada(true);
+    const primerError = Object.values(erroresContacto).find(Boolean);
+    if (primerError) {
+      setErrorGuardado('Corrige los métodos de contacto marcados antes de guardar.');
       return;
     }
 
@@ -645,7 +707,8 @@ export default function EditarPerfilArtistaScreen() {
               >
                 Estos datos son opcionales y podrán
                 mostrarse públicamente en tu perfil
-                artístico.
+                artístico. Para las redes sociales, pega
+                el enlace completo de tu perfil (https://).
               </Text>
 
               <Text style={styles.fieldLabel}>
@@ -654,16 +717,21 @@ export default function EditarPerfilArtistaScreen() {
 
               <TextInput
                 value={correoContacto}
+                onBlur={() => setContactosVisitados((actuales) => [...new Set([...actuales, 'correoContacto'])])}
                 onChangeText={(texto) => {
                   setCorreoContacto(texto);
                   setErrorGuardado('');
                 }}
                 placeholder="contacto@ejemplo.com"
                 placeholderTextColor="#716B79"
-                style={styles.input}
+                style={[styles.input, mostrarErrorContacto('correoContacto') && styles.inputInvalido]}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
               />
+              {mostrarErrorContacto('correoContacto') ? (
+                <Text style={styles.contactError}>{erroresContacto.correoContacto}</Text>
+              ) : null}
 
               <Text style={styles.fieldLabel}>
                 Instagram
@@ -671,15 +739,21 @@ export default function EditarPerfilArtistaScreen() {
 
               <TextInput
                 value={instagram}
+                onBlur={() => setContactosVisitados((actuales) => [...new Set([...actuales, 'instagram'])])}
                 onChangeText={(texto) => {
                   setInstagram(texto);
                   setErrorGuardado('');
                 }}
-                placeholder="@usuario o enlace"
+                placeholder="https://www.instagram.com/usuario/"
                 placeholderTextColor="#716B79"
-                style={styles.input}
+                style={[styles.input, mostrarErrorContacto('instagram') && styles.inputInvalido]}
                 autoCapitalize="none"
+                keyboardType="url"
+                autoCorrect={false}
               />
+              {mostrarErrorContacto('instagram') ? (
+                <Text style={styles.contactError}>{erroresContacto.instagram}</Text>
+              ) : null}
 
               <Text style={styles.fieldLabel}>
                 Facebook
@@ -687,15 +761,21 @@ export default function EditarPerfilArtistaScreen() {
 
               <TextInput
                 value={facebook}
+                onBlur={() => setContactosVisitados((actuales) => [...new Set([...actuales, 'facebook'])])}
                 onChangeText={(texto) => {
                   setFacebook(texto);
                   setErrorGuardado('');
                 }}
-                placeholder="Usuario o enlace"
+                placeholder="https://www.facebook.com/usuario/"
                 placeholderTextColor="#716B79"
-                style={styles.input}
+                style={[styles.input, mostrarErrorContacto('facebook') && styles.inputInvalido]}
                 autoCapitalize="none"
+                keyboardType="url"
+                autoCorrect={false}
               />
+              {mostrarErrorContacto('facebook') ? (
+                <Text style={styles.contactError}>{erroresContacto.facebook}</Text>
+              ) : null}
 
               <Text style={styles.fieldLabel}>
                 Twitter / X
@@ -703,15 +783,21 @@ export default function EditarPerfilArtistaScreen() {
 
               <TextInput
                 value={twitter}
+                onBlur={() => setContactosVisitados((actuales) => [...new Set([...actuales, 'twitter'])])}
                 onChangeText={(texto) => {
                   setTwitter(texto);
                   setErrorGuardado('');
                 }}
-                placeholder="@usuario o enlace"
+                placeholder="https://x.com/usuario"
                 placeholderTextColor="#716B79"
-                style={styles.input}
+                style={[styles.input, mostrarErrorContacto('twitter') && styles.inputInvalido]}
                 autoCapitalize="none"
+                keyboardType="url"
+                autoCorrect={false}
               />
+              {mostrarErrorContacto('twitter') ? (
+                <Text style={styles.contactError}>{erroresContacto.twitter}</Text>
+              ) : null}
             </View>
 
             {errorGuardado ? (
@@ -1119,6 +1205,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginBottom: 4,
+  },
+
+  inputInvalido: {
+    borderColor: '#FF5CA8',
+    borderWidth: 1.5,
+  },
+  contactError: {
+    color: '#FF8DB9',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
   },
 
   messageError: {
