@@ -108,6 +108,14 @@ export default function PerfilArtistaPublicoScreen() {
   const [canciones, setCanciones] =
     useState<Cancion[]>([]);
 
+  const [meGustas, setMeGustas] = useState<string[]>([]);
+  const [procesandoMeGusta, setProcesandoMeGusta] = useState<string | null>(null);
+  const bloqueoMeGusta = useRef<string | null>(null);
+
+  const [guardadas, setGuardadas] = useState<string[]>([]);
+  const [procesandoGuardada, setProcesandoGuardada] = useState<string | null>(null);
+  const bloqueoGuardada = useRef<string | null>(null);
+
   const [cargando, setCargando] =
     useState(true);
 
@@ -142,7 +150,101 @@ export default function PerfilArtistaPublicoScreen() {
 
     cargarPerfilPublico();
     cargarEstadoSeguimiento();
+    cargarMisMeGustas();
+    cargarMisGuardadas();
   }, [usuarioId]);
+
+  const cargarMisMeGustas = async () => {
+    if (esVistaPrevia) return;
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) return;
+      const respuesta = await fetch(`${API_URL}/api/me-gustas/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!respuesta.ok) throw new Error('No se pudieron cargar los Me gusta.');
+      const datos = await respuesta.json();
+      setMeGustas((datos.canciones || []).map((item: { id: string }) => item.id));
+    } catch (error) {
+      console.error('Error al cargar Me gusta:', error);
+    }
+  };
+
+  const alternarMeGusta = async (cancionId: string) => {
+    if (esVistaPrevia || bloqueoMeGusta.current) return;
+    bloqueoMeGusta.current = cancionId;
+    setProcesandoMeGusta(cancionId);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) {
+        Alert.alert('Sesión', 'Inicia sesión para dar Me gusta.');
+        return;
+      }
+      const tieneMeGusta = meGustas.includes(cancionId);
+      const respuesta = await fetch(`${API_URL}/api/me-gustas/${cancionId}`, {
+        method: tieneMeGusta ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.message || 'No se pudo actualizar Me gusta.');
+      setMeGustas((anteriores) =>
+        datos.meGusta === true
+          ? [...new Set([...anteriores, cancionId])]
+          : anteriores.filter((id) => id !== cancionId)
+      );
+    } catch (error) {
+      Alert.alert('Me gusta', error instanceof Error ? error.message : 'Error de conexión.');
+    } finally {
+      bloqueoMeGusta.current = null;
+      setProcesandoMeGusta(null);
+    }
+  };
+
+  const cargarMisGuardadas = async () => {
+    if (esVistaPrevia) return;
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) return;
+      const respuesta = await fetch(`${API_URL}/api/guardadas/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!respuesta.ok) throw new Error('No se pudieron cargar las canciones guardadas.');
+      const datos = await respuesta.json();
+      setGuardadas((datos.canciones || []).map((item: { id: string }) => item.id));
+    } catch (error) {
+      console.error('Error al cargar Guardadas:', error);
+    }
+  };
+
+  const alternarGuardada = async (cancionId: string) => {
+    if (esVistaPrevia || bloqueoGuardada.current) return;
+    bloqueoGuardada.current = cancionId;
+    setProcesandoGuardada(cancionId);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) {
+        Alert.alert('Sesión', 'Inicia sesión para guardar canciones.');
+        return;
+      }
+      const estaGuardada = guardadas.includes(cancionId);
+      const respuesta = await fetch(`${API_URL}/api/guardadas/${cancionId}`, {
+        method: estaGuardada ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.message || 'No se pudo actualizar Guardadas.');
+      setGuardadas((anteriores) =>
+        datos.guardada === true
+          ? [...new Set([...anteriores, cancionId])]
+          : anteriores.filter((id) => id !== cancionId)
+      );
+    } catch (error) {
+      Alert.alert('Guardadas', error instanceof Error ? error.message : 'Error de conexión.');
+    } finally {
+      bloqueoGuardada.current = null;
+      setProcesandoGuardada(null);
+    }
+  };
 
   const cargarEstadoSeguimiento = async () => {
     try {
@@ -825,6 +927,42 @@ router.push('/reproductor');
                             </Text>
                           ) : null}
                         </View>
+
+                        <Pressable
+                          style={styles.songLikeButton}
+                          disabled={esVistaPrevia || procesandoMeGusta !== null}
+                          onPress={() => alternarMeGusta(cancion.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${meGustas.includes(cancion.id) ? 'Quitar Me gusta de' : 'Dar Me gusta a'} ${cancion.titulo}`}
+                        >
+                          {procesandoMeGusta === cancion.id ? (
+                            <ActivityIndicator size="small" color="#FF68B7" />
+                          ) : (
+                            <Ionicons
+                              name={meGustas.includes(cancion.id) ? 'heart' : 'heart-outline'}
+                              size={23}
+                              color={meGustas.includes(cancion.id) ? '#FF68B7' : '#E7A1C8'}
+                            />
+                          )}
+                        </Pressable>
+
+                        <Pressable
+                          style={styles.songSaveButton}
+                          disabled={esVistaPrevia || procesandoGuardada !== null}
+                          onPress={() => alternarGuardada(cancion.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${guardadas.includes(cancion.id) ? 'Quitar de Guardadas' : 'Guardar'} ${cancion.titulo}`}
+                        >
+                          {procesandoGuardada === cancion.id ? (
+                            <ActivityIndicator size="small" color="#54E6FF" />
+                          ) : (
+                            <Ionicons
+                              name={guardadas.includes(cancion.id) ? 'bookmark' : 'bookmark-outline'}
+                              size={22}
+                              color={guardadas.includes(cancion.id) ? '#54E6FF' : '#9FD9E5'}
+                            />
+                          )}
+                        </Pressable>
 
                         <Pressable
                           style={
@@ -1527,6 +1665,30 @@ header: {
     color: '#918A9B',
     fontSize: 12,
     marginTop: 3,
+  },
+
+  songLikeButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 7,
+    backgroundColor: 'rgba(145, 35, 100, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 104, 183, 0.45)',
+  },
+
+  songSaveButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 7,
+    backgroundColor: 'rgba(24, 119, 143, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(84, 230, 255, 0.45)',
   },
 
   songPlayButton: {

@@ -2,8 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
+import { CancionReproductor, usePlayer } from '@/context/PlayerContext';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   ImageBackground,
   Pressable,
@@ -31,6 +33,20 @@ type ArtistaSeguido = {
   fechaSeguimiento: string;
 };
 
+type CancionFavorita = {
+  id: string;
+  usuarioId: string;
+  titulo: string;
+  album: string;
+  generoPrincipal: string;
+  audioId: string | null;
+  portadaId: string | null;
+  fechaMeGusta?: string;
+  fechaGuardado?: string;
+  nombreArtista?: string;
+  fotoArtista?: string | null;
+};
+
 const filtros: { id: Exclude<FiltroBiblioteca, 'todos'>; titulo: string }[] = [
   { id: 'artistas', titulo: 'Artistas seguidos' },
   { id: 'gustas', titulo: 'Me gusta' },
@@ -43,6 +59,16 @@ export default function BibliotecaScreen() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [intento, setIntento] = useState(0);
+  const [cancionesFavoritas, setCancionesFavoritas] = useState<CancionFavorita[]>([]);
+  const [cargandoGustas, setCargandoGustas] = useState(true);
+  const [errorGustas, setErrorGustas] = useState('');
+  const [quitandoMeGusta, setQuitandoMeGusta] = useState<string | null>(null);
+  const [cancionesGuardadas, setCancionesGuardadas] = useState<CancionFavorita[]>([]);
+  const [cargandoGuardadas, setCargandoGuardadas] = useState(true);
+  const [errorGuardadas, setErrorGuardadas] = useState('');
+  const [quitandoGuardada, setQuitandoGuardada] = useState<string | null>(null);
+  const [imagenesConError, setImagenesConError] = useState<string[]>([]);
+  const { cancionActual, reproduciendo, reproducirCancion, alternarReproduccion } = usePlayer();
 
   useFocusEffect(
     useCallback(() => {
@@ -79,6 +105,95 @@ export default function BibliotecaScreen() {
         }
       };
 
+      const cargarMeGustas = async () => {
+        setCargandoGustas(true);
+        setErrorGustas('');
+        try {
+          const token = await SecureStore.getItemAsync('token');
+          if (!token) throw new Error('Inicia sesión para ver tus canciones favoritas.');
+          const respuesta = await fetch(`${API_URL}/api/me-gustas/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const datos = await respuesta.json();
+          if (!respuesta.ok) throw new Error(datos.message || 'No fue posible cargar tus Me gusta.');
+          if (!Array.isArray(datos.canciones)) throw new Error('La respuesta de Me gusta no es válida.');
+
+          const canciones: CancionFavorita[] = datos.canciones;
+          // El endpoint de Me gusta entrega usuarioId, pero no el nombre del artista.
+          // Consultamos una vez por artista y conservamos la lista aunque falle algún perfil.
+          const idsArtistas = [...new Set(canciones.map(c => String(c.usuarioId)))];
+          const perfiles = await Promise.all(idsArtistas.map(async id => {
+            try {
+              const r = await fetch(`${API_URL}/api/perfiles-artista/${id}`);
+              if (!r.ok) return { id, nombre: 'Artista', foto: null };
+              const d = await r.json();
+              return {
+                id,
+                nombre: d.artista?.nombreArtistico || d.artista?.nombreUsuario || 'Artista',
+                foto: d.artista?.fotoPerfil || null,
+              };
+            } catch {
+              return { id, nombre: 'Artista', foto: null };
+            }
+          }));
+          const porId = new Map(perfiles.map(p => [p.id, p]));
+          if (activo) setCancionesFavoritas(canciones.map(c => ({
+            ...c,
+            nombreArtista: porId.get(String(c.usuarioId))?.nombre || 'Artista',
+            fotoArtista: porId.get(String(c.usuarioId))?.foto || null,
+          })));
+        } catch (err) {
+          if (activo) setErrorGustas(err instanceof Error ? err.message : 'Error de conexión.');
+        } finally {
+          if (activo) setCargandoGustas(false);
+        }
+      };
+
+      const cargarGuardadas = async () => {
+        setCargandoGuardadas(true);
+        setErrorGuardadas('');
+        try {
+          const token = await SecureStore.getItemAsync('token');
+          if (!token) throw new Error('Inicia sesión para ver tus canciones guardadas.');
+
+          const respuesta = await fetch(`${API_URL}/api/guardadas/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const datos = await respuesta.json();
+          if (!respuesta.ok) throw new Error(datos.message || 'No fue posible cargar tus canciones guardadas.');
+          if (!Array.isArray(datos.canciones)) throw new Error('La respuesta de Guardadas no es válida.');
+
+          const canciones: CancionFavorita[] = datos.canciones;
+          const idsArtistas = [...new Set(canciones.map(c => String(c.usuarioId)))];
+          const perfiles = await Promise.all(idsArtistas.map(async id => {
+            try {
+              const r = await fetch(`${API_URL}/api/perfiles-artista/${id}`);
+              if (!r.ok) return { id, nombre: 'Artista', foto: null };
+              const d = await r.json();
+              return {
+                id,
+                nombre: d.artista?.nombreArtistico || d.artista?.nombreUsuario || 'Artista',
+                foto: d.artista?.fotoPerfil || null,
+              };
+            } catch {
+              return { id, nombre: 'Artista', foto: null };
+            }
+          }));
+          const porId = new Map(perfiles.map(p => [p.id, p]));
+          if (activo) setCancionesGuardadas(canciones.map(c => ({
+            ...c,
+            nombreArtista: porId.get(String(c.usuarioId))?.nombre || 'Artista',
+            fotoArtista: porId.get(String(c.usuarioId))?.foto || null,
+          })));
+        } catch (err) {
+          if (activo) setErrorGuardadas(err instanceof Error ? err.message : 'Error de conexión.');
+        } finally {
+          if (activo) setCargandoGuardadas(false);
+        }
+      };
+
+      void cargarGuardadas();
+      void cargarMeGustas();
       void cargarArtistas();
       return () => { activo = false; };
     }, [intento])
@@ -172,23 +287,243 @@ export default function BibliotecaScreen() {
     );
   };
 
-  const renderizarPendiente = (tipo: 'gustas' | 'guardadas') => (
-    <View style={[styles.estadoContenedor, tipo === 'gustas' ? styles.estadoGustas : styles.estadoGuardadas]}>
-      <Ionicons
-        name={tipo === 'gustas' ? 'heart-outline' : 'bookmark-outline'}
-        size={36}
-        color={tipo === 'gustas' ? '#FF73BB' : '#65E3FF'}
-      />
-      <Text style={styles.estadoTitulo}>
-        {tipo === 'gustas' ? 'Tus canciones favoritas' : 'Tus canciones guardadas'}
-      </Text>
-      <Text style={styles.estadoDescripcion}>
-        {tipo === 'gustas'
-          ? 'Próximamente podrás encontrar aquí las canciones que te gustan.'
-          : 'Próximamente podrás guardar canciones y encontrarlas aquí.'}
-      </Text>
-    </View>
-  );
+  const reproducirFavorita = (cancion: CancionFavorita, lista: CancionFavorita[] = cancionesFavoritas) => {
+    if (!cancion.audioId) return;
+    if (cancionActual?.id === cancion.id) {
+      alternarReproduccion();
+      return;
+    }
+    const cola: CancionReproductor[] = lista
+      .filter(c => !!c.audioId)
+      .map(c => ({
+        id: c.id,
+        audioId: c.audioId as string,
+        titulo: c.titulo,
+        nombreArtista: c.nombreArtista || 'Artista',
+        portadaId: c.portadaId,
+        fotoArtista: c.fotoArtista || null,
+      }));
+    const seleccionada = cola.find(c => c.id === cancion.id);
+    if (!seleccionada) return;
+    reproducirCancion(seleccionada, cola);
+    router.push('/reproductor');
+  };
+
+  const quitarMeGusta = async (cancion: CancionFavorita) => {
+    if (quitandoMeGusta) return;
+    setQuitandoMeGusta(cancion.id);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) throw new Error('Inicia sesión para modificar tus Me gusta.');
+      const respuesta = await fetch(`${API_URL}/api/me-gustas/${cancion.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.message || 'No se pudo quitar el Me gusta.');
+      setCancionesFavoritas(actual => actual.filter(item => item.id !== cancion.id));
+    } catch (err) {
+      Alert.alert('Me gusta', err instanceof Error ? err.message : 'No fue posible conectar con UnderMusic.');
+    } finally {
+      setQuitandoMeGusta(null);
+    }
+  };
+
+  const renderizarMeGustas = () => {
+    if (cargandoGustas) return (
+      <View style={[styles.estadoContenedor, styles.estadoGustas]}>
+        <ActivityIndicator size="large" color="#FF73BB" />
+        <Text style={styles.estadoDescripcion}>Cargando tus canciones favoritas...</Text>
+      </View>
+    );
+    if (errorGustas) return (
+      <View style={[styles.estadoContenedor, styles.estadoGustas]}>
+        <Ionicons name="alert-circle-outline" size={35} color="#FF73BB" />
+        <Text style={styles.estadoDescripcion}>{errorGustas}</Text>
+        <Pressable onPress={() => setIntento(actual => actual + 1)} style={styles.reintentarBoton}>
+          <Text style={styles.reintentarTexto}>Reintentar</Text>
+        </Pressable>
+      </View>
+    );
+    if (cancionesFavoritas.length === 0) return (
+      <View style={[styles.estadoContenedor, styles.estadoGustas]}>
+        <Ionicons name="heart-outline" size={36} color="#FF73BB" />
+        <Text style={styles.estadoTitulo}>Todavía no tienes canciones favoritas</Text>
+        <Text style={styles.estadoDescripcion}>Toca el corazón de una canción para verla aquí.</Text>
+      </View>
+    );
+    return (
+      <View style={styles.listaArtistas}>
+        {cancionesFavoritas.map(cancion => (
+          <Pressable
+            key={cancion.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Abrir reproductor de ${cancion.titulo} si está seleccionada`}
+            onPress={() => {
+              if (cancionActual?.id === cancion.id) router.push('/reproductor');
+            }}
+            style={({ pressed }) => [styles.tarjetaFavorita, pressed && styles.presionado]}
+          >
+            {cancion.portadaId && !imagenesConError.includes(cancion.id) ? (
+              <Image
+                source={{ uri: `${API_URL}/api/canciones/portadas/${cancion.portadaId}` }}
+                style={styles.portadaFavorita}
+                onError={() => setImagenesConError(actual => actual.includes(cancion.id) ? actual : [...actual, cancion.id])}
+              />
+            ) : cancion.fotoArtista ? (
+              <Image
+                source={{ uri: `${API_URL}/api/usuarios/foto-perfil/${cancion.fotoArtista}` }}
+                style={styles.portadaFavorita}
+              />
+            ) : (
+              <View style={[styles.portadaFavorita, styles.portadaVacia]}>
+                <Ionicons name="musical-note" size={26} color="#FF9ACD" />
+              </View>
+            )}
+            <View style={styles.datosArtista}>
+              <Text style={styles.nombreArtista} numberOfLines={1}>{cancion.titulo}</Text>
+              <Text style={styles.detalleFavorita} numberOfLines={1}>{cancion.nombreArtista || 'Artista'}</Text>
+              <Text style={styles.detalleArtista} numberOfLines={1}>{cancion.generoPrincipal}</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Quitar Me gusta de ${cancion.titulo}`}
+              disabled={quitandoMeGusta !== null}
+              onPress={() => void quitarMeGusta(cancion)}
+              style={({ pressed }) => [styles.botonMeGusta, pressed && styles.presionado]}
+            >
+              {quitandoMeGusta === cancion.id ? (
+                <ActivityIndicator size="small" color="#FF73BB" />
+              ) : (
+                <Ionicons name="heart" size={23} color="#FF73BB" />
+              )}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Reproducir o pausar ${cancion.titulo}`}
+              disabled={!cancion.audioId}
+              onPress={() => reproducirFavorita(cancion)}
+              style={({ pressed }) => [styles.botonReproducir, pressed && styles.presionado, !cancion.audioId && styles.botonDesactivado]}
+            >
+              <Ionicons
+                name={cancionActual?.id === cancion.id && reproduciendo ? 'pause' : 'play'}
+                size={19}
+                color="#FFFFFF"
+              />
+            </Pressable>
+          </Pressable>
+        ))}
+      </View>
+    );
+  };
+
+  const quitarGuardada = async (cancion: CancionFavorita) => {
+    if (quitandoGuardada) return;
+    setQuitandoGuardada(cancion.id);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) throw new Error('Inicia sesión para modificar tus canciones guardadas.');
+      const respuesta = await fetch(`${API_URL}/api/guardadas/${cancion.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.message || 'No se pudo quitar la canción de Guardadas.');
+      setCancionesGuardadas(actual => actual.filter(item => item.id !== cancion.id));
+    } catch (err) {
+      Alert.alert('Guardadas', err instanceof Error ? err.message : 'No fue posible conectar con UnderMusic.');
+    } finally {
+      setQuitandoGuardada(null);
+    }
+  };
+
+  const renderizarGuardadas = () => {
+    if (cargandoGuardadas) return (
+      <View style={[styles.estadoContenedor, styles.estadoGuardadas]}>
+        <ActivityIndicator size="large" color="#65E3FF" />
+        <Text style={styles.estadoDescripcion}>Cargando tus canciones guardadas...</Text>
+      </View>
+    );
+    if (errorGuardadas) return (
+      <View style={[styles.estadoContenedor, styles.estadoGuardadas]}>
+        <Ionicons name="alert-circle-outline" size={35} color="#65E3FF" />
+        <Text style={styles.estadoDescripcion}>{errorGuardadas}</Text>
+        <Pressable onPress={() => setIntento(actual => actual + 1)} style={styles.reintentarBoton}>
+          <Text style={styles.reintentarTexto}>Reintentar</Text>
+        </Pressable>
+      </View>
+    );
+    if (cancionesGuardadas.length === 0) return (
+      <View style={[styles.estadoContenedor, styles.estadoGuardadas]}>
+        <Ionicons name="bookmark-outline" size={36} color="#65E3FF" />
+        <Text style={styles.estadoTitulo}>Todavía no tienes canciones guardadas</Text>
+        <Text style={styles.estadoDescripcion}>Toca el marcador de una canción para verla aquí.</Text>
+      </View>
+    );
+    return (
+      <View style={styles.listaArtistas}>
+        {cancionesGuardadas.map(cancion => (
+          <Pressable
+            key={cancion.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Abrir reproductor de ${cancion.titulo} si está seleccionada`}
+            onPress={() => {
+              if (cancionActual?.id === cancion.id) router.push('/reproductor');
+            }}
+            style={({ pressed }) => [styles.tarjetaGuardada, pressed && styles.presionado]}
+          >
+            {cancion.portadaId && !imagenesConError.includes(cancion.id) ? (
+              <Image
+                source={{ uri: `${API_URL}/api/canciones/portadas/${cancion.portadaId}` }}
+                style={styles.portadaFavorita}
+                onError={() => setImagenesConError(actual => actual.includes(cancion.id) ? actual : [...actual, cancion.id])}
+              />
+            ) : cancion.fotoArtista ? (
+              <Image
+                source={{ uri: `${API_URL}/api/usuarios/foto-perfil/${cancion.fotoArtista}` }}
+                style={styles.portadaFavorita}
+              />
+            ) : (
+              <View style={[styles.portadaFavorita, styles.portadaVaciaGuardada]}>
+                <Ionicons name="musical-note" size={26} color="#65E3FF" />
+              </View>
+            )}
+            <View style={styles.datosArtista}>
+              <Text style={styles.nombreArtista} numberOfLines={1}>{cancion.titulo}</Text>
+              <Text style={styles.detalleGuardada} numberOfLines={1}>{cancion.nombreArtista || 'Artista'}</Text>
+              <Text style={styles.detalleArtista} numberOfLines={1}>{cancion.generoPrincipal}</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Quitar de Guardadas ${cancion.titulo}`}
+              disabled={quitandoGuardada !== null}
+              onPress={() => void quitarGuardada(cancion)}
+              style={({ pressed }) => [styles.botonMeGusta, pressed && styles.presionado]}
+            >
+              {quitandoGuardada === cancion.id ? (
+                <ActivityIndicator size="small" color="#65E3FF" />
+              ) : (
+                <Ionicons name="bookmark" size={23} color="#65E3FF" />
+              )}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Reproducir o pausar ${cancion.titulo}`}
+              disabled={!cancion.audioId}
+              onPress={() => reproducirFavorita(cancion, cancionesGuardadas)}
+              style={({ pressed }) => [styles.botonReproducirGuardada, pressed && styles.presionado, !cancion.audioId && styles.botonDesactivado]}
+            >
+              <Ionicons
+                name={cancionActual?.id === cancion.id && reproduciendo ? 'pause' : 'play'}
+                size={19}
+                color="#FFFFFF"
+              />
+            </Pressable>
+          </Pressable>
+        ))}
+      </View>
+    );
+  };
 
   return (
     <ImageBackground
@@ -242,7 +577,7 @@ export default function BibliotecaScreen() {
               <Text style={styles.seccionTitulo}>Me gusta</Text>
               <Ionicons name="heart-outline" size={23} color="#FF73BB" />
             </View>
-            {renderizarPendiente('gustas')}
+            {renderizarMeGustas()}
           </View>
         )}
 
@@ -252,7 +587,7 @@ export default function BibliotecaScreen() {
               <Text style={styles.seccionTitulo}>Canciones guardadas</Text>
               <Ionicons name="bookmark-outline" size={23} color="#65E3FF" />
             </View>
-            {renderizarPendiente('guardadas')}
+            {renderizarGuardadas()}
           </View>
         )}
 
@@ -293,6 +628,17 @@ const styles = StyleSheet.create({
   seccionEncabezado: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   seccionTitulo: { color: '#FFFFFF', fontSize: 21, fontWeight: '800', flexShrink: 1 },
   listaArtistas: { gap: 11 },
+  tarjetaGuardada: { minHeight: 84, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 18, backgroundColor: 'rgba(8, 44, 59, 0.80)', borderWidth: 1, borderColor: 'rgba(101, 227, 255, 0.48)', flexDirection: 'row', alignItems: 'center', gap: 11 },
+  detalleGuardada: { color: '#8BEAFF', fontSize: 13, marginTop: 4, fontWeight: '600' },
+  portadaVaciaGuardada: { backgroundColor: '#164253', alignItems: 'center', justifyContent: 'center' },
+  botonReproducirGuardada: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12677D', borderWidth: 1, borderColor: '#65E3FF' },
+  tarjetaFavorita: { minHeight: 84, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 18, backgroundColor: 'rgba(49, 13, 37, 0.86)', borderWidth: 1, borderColor: 'rgba(255, 115, 187, 0.48)', flexDirection: 'row', alignItems: 'center', gap: 11 },
+  portadaFavorita: { width: 59, height: 59, borderRadius: 13 },
+  botonMeGusta: { width: 34, height: 42, alignItems: 'center', justifyContent: 'center' },
+  portadaVacia: { backgroundColor: '#51223E', alignItems: 'center', justifyContent: 'center' },
+  detalleFavorita: { color: '#FFB5DA', fontSize: 13, marginTop: 4, fontWeight: '600' },
+  botonReproducir: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#A83379', borderWidth: 1, borderColor: '#FF85C3' },
+  botonDesactivado: { opacity: 0.4 },
   tarjetaArtista: { minHeight: 84, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 18, backgroundColor: 'rgba(23, 12, 43, 0.92)', borderWidth: 1, borderColor: 'rgba(143, 68, 205, 0.55)', flexDirection: 'row', alignItems: 'center', gap: 12 },
   fotoContenedor: { width: 59, height: 59, borderRadius: 15, backgroundColor: '#4B2370', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   fotoArtista: { width: '100%', height: '100%' },
