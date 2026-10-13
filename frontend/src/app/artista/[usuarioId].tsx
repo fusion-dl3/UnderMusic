@@ -27,6 +27,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -150,8 +151,6 @@ export default function PerfilArtistaPublicoScreen() {
 
     cargarPerfilPublico();
     cargarEstadoSeguimiento();
-    cargarMisMeGustas();
-    cargarMisGuardadas();
   }, [usuarioId]);
 
   const cargarMisMeGustas = async () => {
@@ -245,6 +244,17 @@ export default function PerfilArtistaPublicoScreen() {
       setProcesandoGuardada(null);
     }
   };
+
+  // Actualizar los estados al regresar desde el reproductor o Biblioteca.
+  // El perfil permanece montado durante la navegación, por lo que no basta
+  // con consultarlos una sola vez al abrirlo.
+  useFocusEffect(
+    useCallback(() => {
+      if (!usuarioId || esVistaPrevia) return;
+      void cargarMisMeGustas();
+      void cargarMisGuardadas();
+    }, [usuarioId, esVistaPrevia])
+  );
 
   const cargarEstadoSeguimiento = async () => {
     try {
@@ -409,6 +419,23 @@ export default function PerfilArtistaPublicoScreen() {
       await Linking.openURL(url);
     } catch {
       Alert.alert('No se pudo abrir', 'No encontramos una aplicación compatible para abrir este contacto.');
+    }
+  };
+
+  const compartirCancion = async (cancion: Cancion) => {
+    if (esVistaPrevia || !artista) return;
+
+    const nombreArtista = artista.nombreArtistico || artista.nombreUsuario;
+    const mensaje = `🎵 ${cancion.titulo} — ${nombreArtista}\nDescubre música emergente en UnderMusic.`;
+
+    try {
+      await Share.share({ message: mensaje, title: cancion.titulo });
+    } catch (error) {
+      Alert.alert(
+        'Compartir canción',
+        'No fue posible abrir las opciones para compartir.'
+      );
+      console.error('Error al compartir canción:', error);
     }
   };
 
@@ -928,23 +955,19 @@ router.push('/reproductor');
                           ) : null}
                         </View>
 
-                        <Pressable
-                          style={styles.songLikeButton}
-                          disabled={esVistaPrevia || procesandoMeGusta !== null}
-                          onPress={() => alternarMeGusta(cancion.id)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${meGustas.includes(cancion.id) ? 'Quitar Me gusta de' : 'Dar Me gusta a'} ${cancion.titulo}`}
-                        >
-                          {procesandoMeGusta === cancion.id ? (
-                            <ActivityIndicator size="small" color="#FF68B7" />
-                          ) : (
-                            <Ionicons
-                              name={meGustas.includes(cancion.id) ? 'heart' : 'heart-outline'}
-                              size={23}
-                              color={meGustas.includes(cancion.id) ? '#FF68B7' : '#E7A1C8'}
-                            />
-                          )}
-                        </Pressable>
+                         <Pressable
+                           style={styles.songShareButton}
+                           disabled={esVistaPrevia}
+                           onPress={() => compartirCancion(cancion)}
+                           accessibilityRole="button"
+                           accessibilityLabel={`Compartir ${cancion.titulo}`}
+                         >
+                           <Ionicons
+                             name="share-social-outline"
+                             size={21}
+                             color="#DDB9FF"
+                           />
+                         </Pressable>
 
                         <Pressable
                           style={styles.songSaveButton}
@@ -960,6 +983,24 @@ router.push('/reproductor');
                               name={guardadas.includes(cancion.id) ? 'bookmark' : 'bookmark-outline'}
                               size={22}
                               color={guardadas.includes(cancion.id) ? '#54E6FF' : '#9FD9E5'}
+                            />
+                          )}
+                        </Pressable>
+
+                        <Pressable
+                          style={styles.songLikeButton}
+                          disabled={esVistaPrevia || procesandoMeGusta !== null}
+                          onPress={() => alternarMeGusta(cancion.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${meGustas.includes(cancion.id) ? 'Quitar Me gusta de' : 'Dar Me gusta a'} ${cancion.titulo}`}
+                        >
+                          {procesandoMeGusta === cancion.id ? (
+                            <ActivityIndicator size="small" color="#FF68B7" />
+                          ) : (
+                            <Ionicons
+                              name={meGustas.includes(cancion.id) ? 'heart' : 'heart-outline'}
+                              size={23}
+                              color={meGustas.includes(cancion.id) ? '#FF68B7' : '#E7A1C8'}
                             />
                           )}
                         </Pressable>
@@ -1685,13 +1726,26 @@ header: {
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 7,
+    marginRight: 13,
     backgroundColor: 'rgba(24, 119, 143, 0.18)',
     borderWidth: 1,
     borderColor: 'rgba(84, 230, 255, 0.45)',
   },
 
+  songShareButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 13,
+    backgroundColor: 'rgba(120, 66, 175, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(190, 129, 255, 0.45)',
+  },
+
   songPlayButton: {
+    marginLeft: 25,
     width: 42,
     height: 42,
     borderRadius: 21,

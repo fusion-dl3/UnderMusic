@@ -1,14 +1,19 @@
 import {
+  useCallback,
   useRef,
   useState,
 } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import {
+  ActivityIndicator,
+  Alert,
   GestureResponderEvent,
   Image,
   ImageBackground,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -64,7 +69,119 @@ const progressBarWidth =
   buscarPosicion,
   reproducirAnterior,
   reproducirSiguiente,
-} = usePlayer();
+  } = usePlayer();
+
+  const cancionId = cancionActual?.id ?? null;
+  const [meGusta, setMeGusta] = useState(false);
+  const [guardada, setGuardada] = useState(false);
+  const [cargandoAcciones, setCargandoAcciones] = useState(true);
+  const [procesandoMeGusta, setProcesandoMeGusta] = useState(false);
+  const [procesandoGuardada, setProcesandoGuardada] = useState(false);
+  const bloqueoMeGusta = useRef(false);
+  const bloqueoGuardada = useRef(false);
+
+  // Al entrar al reproductor o cambiar de canción, consultamos el estado real.
+  // La cancelación evita mostrar los datos de una canción anterior.
+  useFocusEffect(
+    useCallback(() => {
+      let activo = true;
+      setMeGusta(false);
+      setGuardada(false);
+      setCargandoAcciones(!!cancionId);
+
+      if (cancionId) {
+        const cargarEstados = async () => {
+          try {
+            const token = await SecureStore.getItemAsync('token');
+            if (!token) return;
+            const headers = { Authorization: `Bearer ${token}` };
+            const [respuestaMeGusta, respuestaGuardada] = await Promise.all([
+              fetch(`${API_URL}/api/me-gustas/${cancionId}/estado`, { headers }),
+              fetch(`${API_URL}/api/guardadas/${cancionId}/estado`, { headers }),
+            ]);
+            if (!respuestaMeGusta.ok || !respuestaGuardada.ok) {
+              throw new Error('No fue posible consultar Me gusta y Guardadas.');
+            }
+            const [datosMeGusta, datosGuardada] = await Promise.all([
+              respuestaMeGusta.json(),
+              respuestaGuardada.json(),
+            ]);
+            if (activo) {
+              setMeGusta(datosMeGusta.meGusta === true);
+              setGuardada(datosGuardada.guardada === true);
+            }
+          } catch (error) {
+            console.error('Error al consultar acciones del reproductor:', error);
+          } finally {
+            if (activo) setCargandoAcciones(false);
+          }
+        };
+        void cargarEstados();
+      }
+      return () => { activo = false; };
+    }, [cancionId])
+  );
+
+  const alternarMeGusta = async () => {
+    if (!cancionId || bloqueoMeGusta.current || cargandoAcciones) return;
+    bloqueoMeGusta.current = true;
+    setProcesandoMeGusta(true);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) {
+        Alert.alert('Sesión', 'Inicia sesión para dar Me gusta.');
+        return;
+      }
+      const respuesta = await fetch(`${API_URL}/api/me-gustas/${cancionId}`, {
+        method: meGusta ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.message || 'No se pudo actualizar Me gusta.');
+      if (cancionId === cancionActual?.id) setMeGusta(datos.meGusta === true);
+    } catch (error) {
+      Alert.alert('Me gusta', error instanceof Error ? error.message : 'Error de conexión.');
+    } finally {
+      bloqueoMeGusta.current = false;
+      setProcesandoMeGusta(false);
+    }
+  };
+
+  const alternarGuardada = async () => {
+    if (!cancionId || bloqueoGuardada.current || cargandoAcciones) return;
+    bloqueoGuardada.current = true;
+    setProcesandoGuardada(true);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) {
+        Alert.alert('Sesión', 'Inicia sesión para guardar canciones.');
+        return;
+      }
+      const respuesta = await fetch(`${API_URL}/api/guardadas/${cancionId}`, {
+        method: guardada ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.message || 'No se pudo actualizar Guardadas.');
+      if (cancionId === cancionActual?.id) setGuardada(datos.guardada === true);
+    } catch (error) {
+      Alert.alert('Guardadas', error instanceof Error ? error.message : 'Error de conexión.');
+    } finally {
+      bloqueoGuardada.current = false;
+      setProcesandoGuardada(false);
+    }
+  };
+
+  const compartirCancion = async () => {
+    if (!cancionActual) return;
+    const mensaje = `🎵 ${cancionActual.titulo} — ${cancionActual.nombreArtista}\nDescubre música emergente en UnderMusic.`;
+    try {
+      await Share.share({ message: mensaje, title: cancionActual.titulo });
+    } catch (error) {
+      console.error('Error al compartir canción:', error);
+      Alert.alert('Compartir canción', 'No fue posible abrir las opciones para compartir.');
+    }
+  };
 
   if (!cancionActual) {
     return (
@@ -248,7 +365,14 @@ const progresoVisible =
               </Text>
             </View>
 
-            <View style={styles.headerSpace} />
+            <Pressable
+              style={styles.headerShareButton}
+              onPress={compartirCancion}
+              accessibilityRole="button"
+              accessibilityLabel={`Compartir ${cancionActual.titulo}`}
+            >
+              <Ionicons name="share-social-outline" size={24} color="#DDB9FF" />
+            </Pressable>
           </View>
 
           <View style={styles.content}>
@@ -272,20 +396,51 @@ const progresoVisible =
               </View>
             </View>
 
-            <View style={styles.songInfo}>
-              <Text
-                style={styles.songTitle}
-                numberOfLines={2}
-              >
-                {cancionActual.titulo}
-              </Text>
-
-              <Text
-                style={styles.artistName}
-                numberOfLines={1}
-              >
-                {cancionActual.nombreArtista}
-              </Text>
+            <View style={styles.songInfoRow}>
+              <View style={styles.songInfo}>
+                <Text style={styles.songTitle} numberOfLines={2}>
+                  {cancionActual.titulo}
+                </Text>
+                <Text style={styles.artistName} numberOfLines={1}>
+                  {cancionActual.nombreArtista}
+                </Text>
+              </View>
+              <View style={styles.songActions}>
+                <Pressable
+                  style={styles.saveButton}
+                  onPress={alternarGuardada}
+                  disabled={cargandoAcciones || procesandoGuardada}
+                  accessibilityRole="button"
+                  accessibilityLabel={guardada ? 'Quitar de Guardadas' : 'Guardar canción'}
+                >
+                  {cargandoAcciones || procesandoGuardada ? (
+                    <ActivityIndicator size="small" color="#54E6FF" />
+                  ) : (
+                    <Ionicons
+                      name={guardada ? 'bookmark' : 'bookmark-outline'}
+                      size={24}
+                      color={guardada ? '#54E6FF' : '#9FD9E5'}
+                    />
+                  )}
+                </Pressable>
+                <Pressable
+                  style={styles.likeButton}
+                  onPress={alternarMeGusta}
+                  disabled={cargandoAcciones || procesandoMeGusta}
+                  accessibilityRole="button"
+                  accessibilityLabel={meGusta ? 'Quitar Me gusta' : 'Dar Me gusta'}
+                >
+                  {cargandoAcciones || procesandoMeGusta ? (
+                    <ActivityIndicator size="small" color="#FF68B7" />
+                  ) : (
+                    <Ionicons
+                      name={meGusta ? 'heart' : 'heart-outline'}
+                      size={25}
+                      color={meGusta ? '#FF68B7' : '#E7A1C8'}
+                    />
+                  )}
+                </Pressable>
+              </View>
             </View>
 
             <View style={styles.progressSection}>
@@ -470,9 +625,15 @@ const styles = StyleSheet.create({
     maxWidth: '90%',
   },
 
-  headerSpace: {
+  headerShareButton: {
     width: 48,
     height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(120, 66, 175, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(190, 129, 255, 0.45)',
   },
 
   content: {
@@ -515,9 +676,45 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(74, 31, 111, 0.55)',
   },
 
-  songInfo: {
+  songInfoRow: {
     width: '100%',
     marginTop: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  songInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  songActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  saveButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(24, 119, 143, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(84, 230, 255, 0.45)',
+  },
+
+  likeButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(145, 35, 100, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 104, 183, 0.45)',
   },
 
   songTitle: {
