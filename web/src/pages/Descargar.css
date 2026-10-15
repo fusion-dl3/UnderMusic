@@ -1,0 +1,337 @@
+
+.um-download-page {
+  min-height: 100vh;
+  color: #f5f1ff;
+  background-color: #070611;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(5, 4, 17, 0.55) 0%,
+      rgba(5, 4, 17, 0.88) 42%,
+      rgba(5, 4, 17, 0.96) 100%
+    ),
+    url('/images/fondo-desktop.png');
+  background-position: center top;
+  background-size: cover;
+  background-attachment: fixed;
+  font-family: inherit;
+}
+
+.um-download-page * {
+  box-sizing: border-box;
+}
+
+.um-download-header {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 30px 28px 0;
+}
+
+.um-download-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #ded4f8;
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.um-download-back:hover {
+  color: #ffffff;
+}
+
+.um-download-hero {
+  max-width: 950px;
+  margin: 0 auto;
+  padding: 42px 24px 95px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.um-download-logo {
+  display: block;
+  width: min(100%, 660px);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 30px rgba(130, 45, 255, 0.26));
+}
+
+.um-download-intro {
+  max-width: 630px;
+  margin: 12px auto 30px;
+  color: #e4daf9;
+  font-size: clamp(17px, 2vw, 21px);
+  line-height: 1.7;
+}
+
+.um-download-android {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 17px 28px;
+  border: 1px solid rgba(195, 149, 255, 0.5);
+  border-radius: 16px;
+  color: #ffffff;
+  background: linear-gradient(120deg, #7626e9, #a027d7);
+  box-shadow: 0 0 28px rgba(141, 50, 255, 0.32);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.um-download-status {
+  margin-top: 15px;
+  color: #b8accf;
+  font-size: 13px;
+}
+
+.um-download-section {
+  max-width: 1060px;
+  margin: 0 auto 35px;
+  padding: 48px 50px;
+  border: 1px solid rgba(173, 118, 255, 0.22);
+  border-radius: 25px;
+  background: rgba(13, 10, 35, 0.78);
+  box-shadow: 0 12px 45px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(16px);
+}
+
+.um-download-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 25px;
+  color: #c18bff;
+}
+
+.um-download-section-heading h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(24px, 3vw, 33px);
+  line-height: 1.25;
+}
+
+.um-download-section > p {
+  margin: 0 0 20px;
+  color: #d5cce6;
+  font-size: 16px;
+  line-height: 1.9;
+}
+
+.um-download-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 34px;
+}
+
+.um-download-feature {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 24px;
+  border: 1px solid rgba(163, 100, 255, 0.25);
+  border-radius: 18px;
+  background: rgba(90, 39, 157, 0.13);
+}
+
+.um-download-feature svg {
+  color: #b980ff;
+}
+
+.um-download-feature strong {
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.um-download-feature span {
+  color: #bdb0d1;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.um-download-audience {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 30px 0;
+}
+
+.um-download-audience-card {
+  padding: 27px;
+  border: 1px solid rgba(169, 106, 255, 0.25);
+  border-radius: 20px;
+  background: linear-gradient(
+    140deg,
+    rgba(95, 38, 174, 0.19),
+    rgba(10, 41, 95, 0.16)
+  );
+}
+
+.um-download-audience-card svg {
+  color: #c18bff;
+}
+
+.um-download-audience-card:nth-child(even) svg {
+  color: #35c9f5;
+}
+
+.um-download-audience-card h3 {
+  margin: 15px 0 10px;
+  color: #ffffff;
+  font-size: 19px;
+}
+
+.um-download-audience-card p {
+  margin: 0;
+  color: #c8bedb;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.um-download-section > .um-download-inclusive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 30px 0 0;
+  color: #e5caff;
+  text-align: center;
+  font-weight: 600;
+}
+
+.um-download-inclusive svg {
+  flex-shrink: 0;
+  color: #ff64c8;
+}
+
+.um-download-origin {
+  border-color: rgba(190, 100, 255, 0.35);
+}
+
+.um-download-quote {
+  margin: 35px 0 0;
+  padding: 25px 30px;
+  border-left: 4px solid #b45cff;
+  border-radius: 0 15px 15px 0;
+  background: rgba(123, 49, 196, 0.15);
+  color: #f2dfff;
+  font-size: clamp(18px, 2.4vw, 23px);
+  font-style: italic;
+  line-height: 1.6;
+}
+
+.um-download-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 65px 20px 45px;
+  color: #b9a9d2;
+  text-align: center;
+}
+
+.um-download-footer svg {
+  color: #b980ff;
+}
+
+.um-download-footer strong {
+  color: #ffffff;
+  font-size: 22px;
+}
+
+.um-download-footer span {
+  color: #ca9cff;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.um-download-footer p {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .um-download-page {
+    background-image:
+      linear-gradient(
+        180deg,
+        rgba(5, 4, 17, 0.55),
+        rgba(5, 4, 17, 0.94)
+      ),
+      url('/images/fondo-app.png');
+    background-attachment: scroll;
+  }
+
+  .um-download-header {
+    padding: 22px 20px 0;
+  }
+
+  .um-download-hero {
+    padding: 35px 20px 65px;
+  }
+
+  .um-download-logo {
+    width: min(100%, 430px);
+  }
+
+  .um-download-intro {
+    margin: 16px auto 25px;
+    font-size: 16px;
+  }
+
+  .um-download-android {
+    padding: 15px 20px;
+    font-size: 14px;
+  }
+
+  .um-download-section {
+    margin: 0 15px 22px;
+    padding: 30px 22px;
+    border-radius: 20px;
+  }
+
+  .um-download-section-heading {
+    gap: 12px;
+  }
+
+  .um-download-section-heading h2 {
+    font-size: 23px;
+  }
+
+  .um-download-section > p {
+    font-size: 14px;
+    line-height: 1.85;
+  }
+
+  .um-download-features,
+  .um-download-audience {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .um-download-feature,
+  .um-download-audience-card {
+    padding: 21px;
+  }
+
+  .um-download-quote {
+    padding: 20px;
+    font-size: 18px;
+  }
+
+  .um-download-footer {
+    padding: 45px 20px 35px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .um-download-back {
+    transition: none;
+  }
+}

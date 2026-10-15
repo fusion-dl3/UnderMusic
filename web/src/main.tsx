@@ -6,12 +6,14 @@ import App from './App'
 import PerfilArtistaPublico from './pages/PerfilArtistaPublico'
 import CancionPublica from './pages/CancionPublica'
 import './index.css'
+import Descargar from './pages/Descargar'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />} />
+        <Route path="/descargar" element={<Descargar />} />
         <Route
           path="/artista/:usuarioId"
           element={<PerfilArtistaPublico />}

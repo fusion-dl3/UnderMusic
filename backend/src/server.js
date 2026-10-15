@@ -3,6 +3,8 @@ require('dotenv').config();
 
 const express = require('express');
 
+const cors = require('cors');
+
 const { connectDatabase } = require('./config/database');
 
 const { crearIndicesUsuarios } = require('./models/usuarioModel');
@@ -19,10 +21,36 @@ const seguimientoRoutes = require('./routes/seguimientoRoutes');
 const meGustaRoutes = require('./routes/meGustaRoutes');
 const guardadaRoutes = require('./routes/guardadaRoutes');
 
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const origenesPermitidos = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  ...(process.env.WEB_ORIGIN
+    ? process.env.WEB_ORIGIN.split(',').map((origen) => origen.trim())
+    : []),
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Permitir solicitudes sin encabezado Origin,
+      // como las de la aplicación móvil o Postman.
+      if (!origin || origenesPermitidos.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Origen no permitido por CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
 app.use(express.json());
+
 
 app.get('/', (req, res) => {
   res.json({
