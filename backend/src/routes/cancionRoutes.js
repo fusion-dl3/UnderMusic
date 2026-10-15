@@ -5,6 +5,7 @@ const {
   subirPortadaCancion,
   obtenerMisCanciones,
   obtenerCancionesArtista,
+  obtenerCancionPublica,
   obtenerPortadaCancion,
   obtenerAudioCancion
 } = require('../controllers/cancionController');
@@ -52,6 +53,11 @@ router.patch(
   verificarToken,
   subirArchivosCancion,
   subirPortadaCancion
+);
+
+router.get(
+  '/:cancionId',
+  obtenerCancionPublica
 );
 
 module.exports = router;

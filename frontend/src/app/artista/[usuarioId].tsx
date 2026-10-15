@@ -422,6 +422,18 @@ export default function PerfilArtistaPublicoScreen() {
     }
   };
 
+  const compartirPerfil = async () => {
+    if (!artista || !usuarioId) return;
+    const nombre = artista.nombreArtistico || artista.nombreUsuario;
+    const mensaje = `🎤 Conoce a ${nombre} (@${artista.nombreUsuario}) en UnderMusic.\nDescubre música emergente y apoya a artistas locales.`;
+    try {
+      await Share.share({ message: mensaje, title: `Perfil de ${nombre}` });
+    } catch (error) {
+      console.error('Error al compartir perfil:', error);
+      Alert.alert('Compartir perfil', 'No fue posible abrir las opciones para compartir.');
+    }
+  };
+
   const compartirCancion = async (cancion: Cancion) => {
     if (esVistaPrevia || !artista) return;
 
@@ -707,6 +719,14 @@ router.push('/reproductor');
               >
                 <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFFFFF" />
                 <Text style={styles.contactButtonText}>Contactar</Text>
+              </Pressable>
+              <Pressable
+                onPress={compartirPerfil}
+                style={({ pressed }) => [styles.profileShareButton, pressed && styles.buttonPressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Compartir perfil del artista"
+              >
+                <Ionicons name="share-social-outline" size={22} color="#FFFFFF" />
               </Pressable>
             </View>
           </View>
@@ -1252,6 +1272,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+   profileShareButton: {
+     width: 48, height: 48, borderRadius: 24,
+     alignItems: 'center', justifyContent: 'center',
+     backgroundColor: 'rgba(120, 66, 175, 0.45)',
+     borderWidth: 1, borderColor: 'rgba(190, 129, 255, 0.75)',
+   },
   contactButton: {
     flex: 1,
     minWidth: 0,

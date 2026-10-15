@@ -912,11 +912,77 @@ async function obtenerAudioCancion(req, res) {
   }
 }
 
+
+async function obtenerCancionPublica(req, res) {
+  try {
+    const { cancionId } = req.params;
+
+    if (!ObjectId.isValid(cancionId)) {
+      return res.status(400).json({
+        message: 'El identificador de la canción no es válido'
+      });
+    }
+
+    const canciones = getCancionesCollection();
+
+    const cancion = await canciones.findOne({
+      _id: new ObjectId(cancionId)
+    });
+
+    if (!cancion) {
+      return res.status(404).json({
+        message: 'No se encontró la canción'
+      });
+    }
+
+    const perfilesArtista = getPerfilesArtistaCollection();
+
+    const perfilArtista = await perfilesArtista.findOne({
+      usuarioId: cancion.usuarioId,
+      perfilCompleto: true
+    });
+
+    if (!perfilArtista) {
+      return res.status(404).json({
+        message: 'La canción no está disponible'
+      });
+    }
+
+    return res.status(200).json({
+      cancion: {
+        id: cancion._id.toString(),
+        usuarioId: cancion.usuarioId.toString(),
+        titulo: cancion.titulo,
+        album: cancion.album || '',
+        generoPrincipal: cancion.generoPrincipal,
+        generosSecundarios: cancion.generosSecundarios || [],
+        audioId: cancion.audioId || null,
+        portadaId: cancion.portadaId || null,
+        fechaPublicacion: cancion.fechaPublicacion,
+        nombreArtistico: perfilArtista.nombreArtistico
+      }
+    });
+
+  } catch (error) {
+    console.error(
+      'Error al obtener canción pública:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'No fue posible obtener la canción'
+    });
+  }
+}
+
+
+
 module.exports = {
   publicarCancion,
   subirPortadaCancion,
   obtenerMisCanciones,
   obtenerCancionesArtista,
+  obtenerCancionPublica,
   obtenerPortadaCancion,
   obtenerAudioCancion
 };

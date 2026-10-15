@@ -12,6 +12,8 @@ import {
   ImageBackground,
   Pressable,
   ScrollView,
+  Share,
+  Alert,
   StyleSheet,
   Text,
   View,
@@ -211,6 +213,18 @@ export default function PerfilScreen() {
     }
   };
 
+  const compartirMiPerfil = async () => {
+    if (usuario?.rol !== 'artista' || !perfilArtista) return;
+    const nombre = perfilArtista.nombreArtistico || usuario.nombreUsuario;
+    const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreUsuario}) en UnderMusic.\nDescubre música emergente y apoya a artistas locales.`;
+    try {
+      await Share.share({ message: mensaje, title: `Perfil de ${nombre}` });
+    } catch (error) {
+      console.error('Error al compartir mi perfil:', error);
+      Alert.alert('Compartir perfil', 'No fue posible abrir las opciones para compartir.');
+    }
+  };
+
   if (cargando) {
     return (
       <View style={styles.centerContainer}>
@@ -365,6 +379,19 @@ export default function PerfilScreen() {
             >
               <Ionicons name="eye-outline" size={22} color="#EAC6FF" />
               <Text style={styles.previewProfileButtonText}>Ver mi perfil público</Text>
+              <Ionicons name="chevron-forward" size={20} color="#D59AFF" />
+            </Pressable>
+          ) : null}
+
+          {esArtista && perfilArtista ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Compartir mi perfil artístico"
+              onPress={compartirMiPerfil}
+              style={({ pressed }) => [styles.shareMyProfileButton, pressed && styles.buttonPressed]}
+            >
+              <Ionicons name="share-social-outline" size={22} color="#EAC6FF" />
+              <Text style={styles.shareMyProfileButtonText}>Compartir mi perfil</Text>
               <Ionicons name="chevron-forward" size={20} color="#D59AFF" />
             </Pressable>
           ) : null}
@@ -1136,6 +1163,16 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 
+  shareMyProfileButton: {
+    width: '100%', maxWidth: 440, alignSelf: 'center',
+    marginTop: 12, minHeight: 54, paddingHorizontal: 18,
+    borderRadius: 18, flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(79, 32, 124, 0.60)',
+    borderWidth: 1, borderColor: '#B77CFF',
+  },
+  shareMyProfileButtonText: {
+    flex: 1, color: '#FFFFFF', fontSize: 15, fontWeight: '700',
+  },
   previewProfileButton: {
     width: '100%',
     maxWidth: 440,
