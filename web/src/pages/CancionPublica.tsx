@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { apiUrl } from '../config/api';
 import {
   ArrowLeft,
   Bookmark,
@@ -73,7 +74,7 @@ export default function CancionPublica() {
 
       try {
         const respuesta = await fetch(
-          `/api/canciones/${cancionId}`,
+          apiUrl(`/api/canciones/${cancionId}`),
           { signal: controlador.signal }
         )
 
@@ -234,7 +235,7 @@ async function reiniciarCancion() {
               {cancion.portadaId ? (
                 <img
                   className="um-player-cover"
-                  src={`/api/canciones/portadas/${cancion.portadaId}`}
+                  src={apiUrl(`/api/canciones/portadas/${cancion.portadaId}`)}
                   alt={`Portada de ${cancion.titulo}`}
                 />
               ) : (
@@ -278,7 +279,7 @@ async function reiniciarCancion() {
             ref={audioRef}
             src={
               cancion.audioId
-                ? `/api/canciones/audio/${cancion.audioId}`
+                ? apiUrl(`/api/canciones/audio/${cancion.audioId}`)
                 : undefined
             }
             preload="metadata"

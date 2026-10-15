@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { apiUrl } from '../config/api';
 import './PerfilArtistaPublico.css'
 
 type Artista = {
@@ -62,7 +63,7 @@ const [errorCanciones, setErrorCanciones] = useState('')
 
       try {
         const respuesta = await fetch(
-          `/api/perfiles-artista/${usuarioId}`,
+          apiUrl(`/api/perfiles-artista/${usuarioId}`),
           { signal: controlador.signal }
         )
 
@@ -111,7 +112,7 @@ useEffect(() => {
 
     try {
       const respuesta = await fetch(
-        `/api/canciones/artista/${usuarioId}`,
+        apiUrl(`/api/canciones/artista/${usuarioId}`),
         { signal: controlador.signal }
       )
 
@@ -192,7 +193,7 @@ useEffect(() => {
               {artista.fotoPerfil ? (
                 <img
                   className="perfil-foto"
-                  src={`/api/usuarios/foto-perfil/${artista.fotoPerfil}`}
+                  src={apiUrl(`/api/usuarios/foto-perfil/${artista.fotoPerfil}`)}
                   alt={`Fotografía de ${artista.nombreArtistico}`}
                 />
               ) : (
@@ -302,7 +303,7 @@ useEffect(() => {
           {cancion.portadaId ? (
             <img
               className="perfil-cancion-portada"
-              src={`/api/canciones/portadas/${cancion.portadaId}`}
+              src={apiUrl(`/api/canciones/portadas/${cancion.portadaId}`)}
               alt={`Portada de ${cancion.titulo}`}
               loading="lazy"
             />
