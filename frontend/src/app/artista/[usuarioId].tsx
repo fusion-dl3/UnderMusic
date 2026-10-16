@@ -425,7 +425,8 @@ export default function PerfilArtistaPublicoScreen() {
   const compartirPerfil = async () => {
     if (!artista || !usuarioId) return;
     const nombre = artista.nombreArtistico || artista.nombreUsuario;
-    const mensaje = `🎤 Conoce a ${nombre} (@${artista.nombreUsuario}) en UnderMusic.\nDescubre música emergente y apoya a artistas locales.`;
+const enlace = `https://under-music.vercel.app/artista/${usuarioId}`;
+const mensaje = `🎤 ¡Conoce a ${nombre} (@${artista.nombreUsuario}) en UnderMusic!\n\nDescubre música emergente y apoya a artistas locales.\n\n🔗 ${enlace}`;
     try {
       await Share.share({ message: mensaje, title: `Perfil de ${nombre}` });
     } catch (error) {
@@ -438,7 +439,8 @@ export default function PerfilArtistaPublicoScreen() {
     if (esVistaPrevia || !artista) return;
 
     const nombreArtista = artista.nombreArtistico || artista.nombreUsuario;
-    const mensaje = `🎵 ${cancion.titulo} — ${nombreArtista}\nDescubre música emergente en UnderMusic.`;
+const enlace = `https://under-music.vercel.app/cancion/${cancion.id}`;
+const mensaje = `🎵 ¡Escucha "${cancion.titulo}" de ${nombreArtista} en UnderMusic!\n\nDescubre música emergente, conoce nuevos artistas y apoya el talento independiente.\n\n🔗 ${enlace}`;
 
     try {
       await Share.share({ message: mensaje, title: cancion.titulo });

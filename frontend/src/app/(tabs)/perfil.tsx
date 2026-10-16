@@ -216,7 +216,8 @@ export default function PerfilScreen() {
   const compartirMiPerfil = async () => {
     if (usuario?.rol !== 'artista' || !perfilArtista) return;
     const nombre = perfilArtista.nombreArtistico || usuario.nombreUsuario;
-    const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreUsuario}) en UnderMusic.\nDescubre música emergente y apoya a artistas locales.`;
+    const enlace = `https://under-music.vercel.app/artista/${usuario.id}`;
+const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreUsuario}) en UnderMusic.\nDescubre música emergente y apoya a artistas locales.\n\n${enlace}`;
     try {
       await Share.share({ message: mensaje, title: `Perfil de ${nombre}` });
     } catch (error) {

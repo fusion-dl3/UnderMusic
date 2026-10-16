@@ -541,3 +541,64 @@
     height: 42px;
   }
 }
+
+/* Menú para compartir canciones */
+
+.um-player-share-container {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.um-player-share-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 100;
+
+  width: 245px;
+  padding: 8px;
+
+  background: #1c122c;
+  border: 1px solid rgba(179, 110, 255, 0.4);
+  border-radius: 14px;
+
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.45),
+    0 0 18px rgba(148, 73, 230, 0.12);
+}
+
+.um-player-share-menu button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  width: 100%;
+  padding: 12px;
+
+  color: #f5edff;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+
+  transition: background 0.2s ease;
+}
+
+.um-player-share-menu button:hover {
+  background: rgba(163, 91, 245, 0.18);
+}
+
+.um-player-share-menu button svg {
+  flex-shrink: 0;
+  color: #c68cff;
+}
+
+@media (max-width: 400px) {
+  .um-player-share-menu {
+    width: min(245px, calc(100vw - 24px));
+  }
+}

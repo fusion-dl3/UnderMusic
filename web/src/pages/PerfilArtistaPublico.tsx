@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, Bookmark, Check, Disc3, ExternalLink, Heart,
+  ArrowLeft, Bookmark, Check, Copy, Disc3, ExternalLink, Heart,
   Mail, MapPin, MessageCircleMore, Music2, Play, Share2, UserRound,
   UserRoundPlus, UsersRound, X,
 } from 'lucide-react'
@@ -71,6 +71,13 @@ export default function PerfilArtistaPublico() {
   const [accionRestringida, setAccionRestringida] = useState<AccionRestringida>(null)
   const [avisoCompartido, setAvisoCompartido] = useState('')
 
+  const [menuCompartir, setMenuCompartir] = useState<{
+  id: string
+  url: string
+  titulo: string
+  mensaje: string
+} | null>(null)
+
   useEffect(() => {
     if (!usuarioId) {
       setError('Identificador de artista no válido.')
@@ -137,18 +144,82 @@ export default function PerfilArtistaPublico() {
   }, [contactoVisible, accionRestringida])
 
   async function compartir(url: string, titulo: string, mensaje: string) {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: titulo, text: mensaje, url })
-      } else {
-        await navigator.clipboard.writeText(url)
-        setAvisoCompartido('Enlace copiado al portapapeles')
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
-      setAvisoCompartido('No se pudo compartir el enlace. Puedes copiarlo desde la barra de direcciones.')
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        title: titulo,
+        text: mensaje,
+        url,
+      })
+    } else {
+      await navigator.clipboard.writeText(`${mensaje}\n\n🔗 ${url}`)
+      setAvisoCompartido('Mensaje y enlace copiados al portapapeles')
     }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return
+
+    setAvisoCompartido(
+      'No se pudo compartir el contenido. Puedes copiar el enlace desde la barra de direcciones.'
+    )
   }
+}
+
+function alternarMenuCompartir(
+  id: string,
+  url: string,
+  titulo: string,
+  mensaje: string
+) {
+  setMenuCompartir((actual) =>
+    actual?.id === id
+      ? null
+      : { id, url, titulo, mensaje }
+  )
+}
+
+async function copiarMensajeYEnlace() {
+  if (!menuCompartir) return
+
+  try {
+    await navigator.clipboard.writeText(
+      `${menuCompartir.mensaje}\n\n🔗 ${menuCompartir.url}`
+    )
+
+    setAvisoCompartido('Mensaje y enlace copiados al portapapeles')
+    setMenuCompartir(null)
+  } catch {
+    setAvisoCompartido('No se pudo copiar el mensaje')
+    setMenuCompartir(null)
+  }
+}
+
+function renderizarMenuCompartir(id: string) {
+  if (!menuCompartir || menuCompartir.id !== id) return null
+
+  return (
+    <div className="perfil-menu-compartir">
+      <button
+        type="button"
+        onClick={() => {
+          const { url, titulo, mensaje } = menuCompartir
+          setMenuCompartir(null)
+          void compartir(url, titulo, mensaje)
+        }}
+      >
+        <Share2 size={18} />
+        Compartir vínculo
+      </button>
+
+      <button
+        type="button"
+        onClick={() => void copiarMensajeYEnlace()}
+      >
+        <Copy size={18} />
+        Copiar mensaje y enlace
+      </button>
+    </div>
+  )
+}
 
   const contactos: Contacto[] = []
   const correo = artista?.correoContacto?.trim() || ''
@@ -227,9 +298,23 @@ export default function PerfilArtistaPublico() {
               <button type="button" className="perfil-contactar" onClick={() => setContactoVisible(true)}>
                 <MessageCircleMore size={20} /> Contactar
               </button>
-              <button type="button" className="perfil-compartir" aria-label="Compartir perfil" onClick={() => void compartir(`${WEB_PUBLICA}/artista/${usuarioId}`, `Perfil de ${nombreArtista}`, `Conoce a ${nombreArtista} en UnderMusic`)}>
-                <Share2 size={22} />
-              </button>
+              <button
+  type="button"
+  className="perfil-compartir"
+  aria-label="Compartir perfil"
+  aria-expanded={menuCompartir?.id === 'perfil'}
+  onClick={() =>
+    alternarMenuCompartir(
+      'perfil',
+      `${WEB_PUBLICA}/artista/${usuarioId}`,
+      `Perfil de ${nombreArtista}`,
+      `🎤 ¡Conoce a ${nombreArtista} (@${artista.nombreUsuario}) en UnderMusic!\n\nDescubre música emergente y apoya a artistas locales.`
+    )
+  }
+>
+    <Share2 size={22} />
+</button>
+{renderizarMenuCompartir('perfil')}
             </div>
           </section>
 
@@ -283,8 +368,26 @@ export default function PerfilArtistaPublico() {
                         <p className="perfil-cancion-genero">{cancion.generoPrincipal}</p>
                         {cancion.album && <p className="perfil-cancion-album">{cancion.album}</p>}
                       </div>
-                      <div className="perfil-cancion-acciones">
-                        <button type="button" className="perfil-cancion-accion perfil-cancion-compartir" aria-label={`Compartir ${cancion.titulo}`} onClick={() => void compartir(`${WEB_PUBLICA}/cancion/${cancion.id}`, cancion.titulo, `${cancion.titulo} de ${nombreArtista} en UnderMusic`)}><Share2 size={20} /></button>
+                                            <div className="perfil-cancion-acciones">
+                        <button
+  type="button"
+  className="perfil-cancion-accion perfil-cancion-compartir"
+  aria-label={`Compartir ${cancion.titulo}`}
+  aria-expanded={menuCompartir?.id === `cancion-${cancion.id}`}
+  onClick={() =>
+    alternarMenuCompartir(
+      `cancion-${cancion.id}`,
+      `${WEB_PUBLICA}/cancion/${cancion.id}`,
+      cancion.titulo,
+      `🎵 ¡Escucha "${cancion.titulo}" de ${nombreArtista} en UnderMusic!\n\nDescubre música emergente, conoce nuevos artistas y apoya el talento independiente.`
+    )
+  }
+>
+  <Share2 size={20} />
+</button>
+
+{renderizarMenuCompartir(`cancion-${cancion.id}`)}
+
                         <button type="button" className="perfil-cancion-accion perfil-cancion-guardar" aria-label={`Guardar ${cancion.titulo}`} onClick={() => setAccionRestringida('guardar')}><Bookmark size={21} /></button>
                         <button type="button" className="perfil-cancion-accion perfil-cancion-megusta" aria-label={`Dar Me gusta a ${cancion.titulo}`} onClick={() => setAccionRestringida('me-gusta')}><Heart size={22} /></button>
                         {cancion.audioId ? (

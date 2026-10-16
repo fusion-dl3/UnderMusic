@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Bookmark,
   Check,
+  Copy,
   Heart,
   Music2,
   Pause,
@@ -55,6 +56,7 @@ export default function CancionPublica() {
   const [accionRestringida, setAccionRestringida] =
     useState<AccionRestringida>(null)
   const [mensajeCompartir, setMensajeCompartir] = useState('')
+  const [menuCompartirVisible, setMenuCompartirVisible] = useState(false)
 
   useEffect(() => {
     if (!cancionId) {
@@ -176,33 +178,58 @@ async function reiniciarCancion() {
     setPosicion(nuevaPosicion)
   }
 
+  async function copiarMensajeCancion() {
+  if (!cancion) return
+
+  const url = `${window.location.origin}/cancion/${cancion.id}`
+
+  const mensaje =
+    `🎵 ¡Escucha "${cancion.titulo}" de ${cancion.nombreArtistico} en UnderMusic!\n\n` +
+    `Descubre música emergente, conoce nuevos artistas y apoya el talento independiente.\n\n` +
+    `🔗 ${url}`
+
+  try {
+    await navigator.clipboard.writeText(mensaje)
+
+    setMensajeCompartir('Mensaje y enlace copiados')
+    window.setTimeout(() => setMensajeCompartir(''), 2500)
+  } catch {
+    setMensajeCompartir('No se pudo copiar el mensaje')
+    window.setTimeout(() => setMensajeCompartir(''), 2500)
+  }
+}
+
   async function compartirCancion() {
-    if (!cancion) return
+  if (!cancion) return
 
-    const url = window.location.href
-    const titulo = `${cancion.titulo} — ${cancion.nombreArtistico}`
+  const url = `${window.location.origin}/cancion/${cancion.id}`
+  const titulo = `${cancion.titulo} — ${cancion.nombreArtistico}`
 
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: titulo,
-          text: 'Escucha esta canción en UnderMusic',
-          url,
-        })
-      } else {
-        await navigator.clipboard.writeText(url)
-        setMensajeCompartir('Enlace copiado')
-        window.setTimeout(() => setMensajeCompartir(''), 2500)
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return
-      }
+  const mensaje =
+    `🎵 ¡Escucha "${cancion.titulo}" de ${cancion.nombreArtistico} en UnderMusic!\n\n` +
+    `Descubre música emergente, conoce nuevos artistas y apoya el talento independiente.`
 
-      setMensajeCompartir('No se pudo compartir el enlace')
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        title: titulo,
+        text: mensaje,
+        url,
+      })
+    } else {
+      await navigator.clipboard.writeText(`${mensaje}\n\n🔗 ${url}`)
+      setMensajeCompartir('Mensaje y enlace copiados')
       window.setTimeout(() => setMensajeCompartir(''), 2500)
     }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return
+    }
+
+    setMensajeCompartir('No se pudo compartir la canción')
+    window.setTimeout(() => setMensajeCompartir(''), 2500)
   }
+}
 
   const progreso =
     duracion > 0
@@ -252,15 +279,44 @@ async function reiniciarCancion() {
   </Link>
 </div>
 
-        <button
-          className="um-player-header-button um-player-share"
-          onClick={() => void compartirCancion()}
-          disabled={!cancion}
-          aria-label="Compartir canción"
-          type="button"
-        >
-          <Share2 size={23} />
-        </button>
+        <div className="um-player-share-container">
+  <button
+    className="um-player-header-button um-player-share"
+    onClick={() => setMenuCompartirVisible(!menuCompartirVisible)}
+    disabled={!cancion}
+    aria-label="Compartir canción"
+    aria-expanded={menuCompartirVisible}
+    type="button"
+  >
+    <Share2 size={23} />
+  </button>
+
+  {menuCompartirVisible && (
+    <div className="um-player-share-menu">
+      <button
+        type="button"
+        onClick={() => {
+          setMenuCompartirVisible(false)
+          void compartirCancion()
+        }}
+      >
+        <Share2 size={18} />
+        Compartir vínculo
+      </button>
+
+      <button
+  type="button"
+  onClick={() => {
+    setMenuCompartirVisible(false)
+    void copiarMensajeCancion()
+  }}
+>
+  <Copy size={18} />
+  Copiar mensaje y enlace
+</button>
+    </div>
+  )}
+</div>
       </header>
 
       {cargando && (

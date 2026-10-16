@@ -174,7 +174,8 @@ const progressBarWidth =
 
   const compartirCancion = async () => {
     if (!cancionActual) return;
-    const mensaje = `🎵 ${cancionActual.titulo} — ${cancionActual.nombreArtista}\nDescubre música emergente en UnderMusic.`;
+    const enlace = `https://under-music.vercel.app/cancion/${cancionActual.id}`;
+const mensaje = `🎵 ¡Escucha "${cancionActual.titulo}" de ${cancionActual.nombreArtista} en UnderMusic!\n\nDescubre música emergente, conoce nuevos artistas y apoya el talento independiente.\n\n🔗 ${enlace}`;
     try {
       await Share.share({ message: mensaje, title: cancionActual.titulo });
     } catch (error) {

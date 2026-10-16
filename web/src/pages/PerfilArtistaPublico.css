@@ -222,3 +222,66 @@
   .perfil-acciones button { font-size: 13px; }
   .perfil-acciones .perfil-compartir { flex-basis: 44px; width: 44px; }
 }
+
+/* Menús para compartir perfiles y canciones */
+
+.perfil-acciones,
+.perfil-cancion-acciones {
+  position: relative;
+}
+
+.perfil-menu-compartir {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 100;
+
+  width: 245px;
+  padding: 8px;
+
+  background: #1c122c;
+  border: 1px solid rgba(179, 110, 255, 0.4);
+  border-radius: 14px;
+
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.45),
+    0 0 18px rgba(148, 73, 230, 0.12);
+}
+
+.perfil-menu-compartir button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 11px;
+
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+
+  color: #f5edff;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+
+  transition: background 0.2s ease;
+}
+
+.perfil-menu-compartir button:hover {
+  background: rgba(163, 91, 245, 0.18);
+}
+
+.perfil-menu-compartir button svg {
+  flex-shrink: 0;
+  color: #c68cff;
+}
+
+@media (max-width: 400px) {
+  .perfil-menu-compartir {
+    width: min(245px, calc(100vw - 24px));
+  }
+}
