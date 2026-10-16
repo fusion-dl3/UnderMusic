@@ -1,8 +1,13 @@
-
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { apiUrl } from '../config/api';
+import { Link, useParams } from 'react-router-dom'
+import {
+  ArrowLeft, Bookmark, Check, Disc3, ExternalLink, Heart,
+  Mail, MapPin, MessageCircleMore, Music2, Play, Share2, UserRound,
+  UserRoundPlus, UsersRound, X,
+} from 'lucide-react'
+import { apiUrl } from '../config/api'
 import './PerfilArtistaPublico.css'
+const WEB_PUBLICA = 'https://under-music.vercel.app'
 
 type Artista = {
   usuarioId: string
@@ -12,17 +17,12 @@ type Artista = {
   biografia: string
   generoPrincipal: string
   generosAdicionales: string[]
-  ubicacion: {
-    pais: string
-    region: string
-    comuna: string
-  }
+  ubicacion: { pais: string; region: string; comuna: string }
   correoContacto: string
   instagram: string
   facebook: string
   twitter: string
 }
-
 
 type Cancion = {
   id: string
@@ -30,22 +30,46 @@ type Cancion = {
   album: string
   generoPrincipal: string
   generosSecundarios: string[]
-  audioId: string
+  audioId: string | null
   portadaId: string | null
 }
 
+type AccionRestringida = 'seguir' | 'guardar' | 'me-gusta' | null
+
+type Contacto = {
+  nombre: string
+  detalle: string
+  url: string
+  icono: 'correo' | 'instagram' | 'facebook' | 'x'
+}
+
+function urlRedSocial(valor: string | undefined, dominios: string[]): string | null {
+  if (!valor?.trim()) return null
+  try {
+    const url = new URL(valor.trim())
+    const host = url.hostname.toLowerCase()
+    if (
+      url.protocol !== 'https:' || url.username || url.password ||
+      url.pathname === '/' ||
+      !dominios.some((dominio) => host === dominio || host === `www.${dominio}`)
+    ) return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
 
 export default function PerfilArtistaPublico() {
   const { usuarioId } = useParams<{ usuarioId: string }>()
-
   const [artista, setArtista] = useState<Artista | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
-  
-const [canciones, setCanciones] = useState<Cancion[]>([])
-const [cargandoCanciones, setCargandoCanciones] = useState(true)
-const [errorCanciones, setErrorCanciones] = useState('')
-
+  const [canciones, setCanciones] = useState<Cancion[]>([])
+  const [cargandoCanciones, setCargandoCanciones] = useState(true)
+  const [errorCanciones, setErrorCanciones] = useState('')
+  const [contactoVisible, setContactoVisible] = useState(false)
+  const [accionRestringida, setAccionRestringida] = useState<AccionRestringida>(null)
+  const [avisoCompartido, setAvisoCompartido] = useState('')
 
   useEffect(() => {
     if (!usuarioId) {
@@ -53,294 +77,284 @@ const [errorCanciones, setErrorCanciones] = useState('')
       setCargando(false)
       return
     }
-
     const controlador = new AbortController()
-
     async function cargarArtista() {
       setCargando(true)
       setError('')
       setArtista(null)
-
       try {
-        const respuesta = await fetch(
-          apiUrl(`/api/perfiles-artista/${usuarioId}`),
-          { signal: controlador.signal }
-        )
-
+        const respuesta = await fetch(apiUrl(`/api/perfiles-artista/${usuarioId}`), { signal: controlador.signal })
         const datos = await respuesta.json()
-
-        if (!respuesta.ok) {
-          throw new Error(
-            datos.message || 'No se pudo cargar el artista.'
-          )
-        }
-
+        if (!respuesta.ok) throw new Error(datos.message || 'No se pudo cargar el artista.')
         setArtista(datos.artista)
       } catch (err) {
         if (controlador.signal.aborted) return
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Ocurrió un error inesperado.'
-        )
+        setError(err instanceof Error ? err.message : 'Ocurrió un error inesperado.')
       } finally {
-        if (!controlador.signal.aborted) {
-          setCargando(false)
-        }
+        if (!controlador.signal.aborted) setCargando(false)
       }
     }
-
-    cargarArtista()
-
+    void cargarArtista()
     return () => controlador.abort()
   }, [usuarioId])
 
-  
-useEffect(() => {
-  if (!usuarioId) {
-    setCargandoCanciones(false)
-    return
-  }
+  useEffect(() => {
+    if (!usuarioId) {
+      setCargandoCanciones(false)
+      return
+    }
+    const controlador = new AbortController()
+    async function cargarCanciones() {
+      setCargandoCanciones(true)
+      setErrorCanciones('')
+      setCanciones([])
+      try {
+        const respuesta = await fetch(apiUrl(`/api/canciones/artista/${usuarioId}`), { signal: controlador.signal })
+        const datos = await respuesta.json()
+        if (!respuesta.ok) throw new Error(datos.message || 'No se pudieron cargar las canciones.')
+        setCanciones(datos.canciones || [])
+      } catch (err) {
+        if (controlador.signal.aborted) return
+        setErrorCanciones(err instanceof Error ? err.message : 'Error al cargar las canciones.')
+      } finally {
+        if (!controlador.signal.aborted) setCargandoCanciones(false)
+      }
+    }
+    void cargarCanciones()
+    return () => controlador.abort()
+  }, [usuarioId])
 
-  const controlador = new AbortController()
+  useEffect(() => {
+    if (!contactoVisible && !accionRestringida) return
+    function alPresionarTecla(evento: KeyboardEvent) {
+      if (evento.key === 'Escape') {
+        setContactoVisible(false)
+        setAccionRestringida(null)
+      }
+    }
+    document.addEventListener('keydown', alPresionarTecla)
+    return () => document.removeEventListener('keydown', alPresionarTecla)
+  }, [contactoVisible, accionRestringida])
 
-  async function cargarCanciones() {
-    setCargandoCanciones(true)
-    setErrorCanciones('')
-    setCanciones([])
-
+  async function compartir(url: string, titulo: string, mensaje: string) {
     try {
-      const respuesta = await fetch(
-        apiUrl(`/api/canciones/artista/${usuarioId}`),
-        { signal: controlador.signal }
-      )
-
-      const datos = await respuesta.json()
-
-      if (!respuesta.ok) {
-        throw new Error(
-          datos.message || 'No se pudieron cargar las canciones.'
-        )
+      if (navigator.share) {
+        await navigator.share({ title: titulo, text: mensaje, url })
+      } else {
+        await navigator.clipboard.writeText(url)
+        setAvisoCompartido('Enlace copiado al portapapeles')
       }
-
-      setCanciones(datos.canciones || [])
     } catch (err) {
-      if (controlador.signal.aborted) return
-
-      setErrorCanciones(
-        err instanceof Error
-          ? err.message
-          : 'Error al cargar las canciones.'
-      )
-    } finally {
-      if (!controlador.signal.aborted) {
-        setCargandoCanciones(false)
-      }
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      setAvisoCompartido('No se pudo compartir el enlace. Puedes copiarlo desde la barra de direcciones.')
     }
   }
 
-  cargarCanciones()
+  const contactos: Contacto[] = []
+  const correo = artista?.correoContacto?.trim() || ''
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+    contactos.push({ nombre: 'Correo electrónico', detalle: correo, url: `mailto:${correo}`, icono: 'correo' })
+  }
+  const redes = [
+    { nombre: 'Instagram', valor: artista?.instagram, dominios: ['instagram.com'], icono: 'instagram' },
+    { nombre: 'Facebook', valor: artista?.facebook, dominios: ['facebook.com', 'fb.com'], icono: 'facebook' },
+    { nombre: 'X', valor: artista?.twitter, dominios: ['x.com', 'twitter.com'], icono: 'x' },
+  ] as const
+  for (const red of redes) {
+    const url = urlRedSocial(red.valor, [...red.dominios])
+    if (url) contactos.push({ nombre: red.nombre, detalle: red.valor || '', url, icono: red.icono })
+  }
 
-  return () => controlador.abort()
-}, [usuarioId])
-
-
+  const nombreArtista = artista?.nombreArtistico || artista?.nombreUsuario || 'este artista'
   const ubicacion = artista
-    ? [
-        artista.ubicacion.comuna,
-        artista.ubicacion.region,
-        artista.ubicacion.pais
-      ].filter(Boolean).join(', ')
+    ? [artista.ubicacion?.comuna, artista.ubicacion?.region].filter(Boolean).join(', ')
     : ''
-
-  const generos = artista
-    ? [
-        artista.generoPrincipal,
-        ...artista.generosAdicionales
-      ].filter(Boolean)
-    : []
+  const mensajeRestringido = accionRestringida === 'seguir'
+    ? `Para seguir a ${nombreArtista}, necesitas utilizar la aplicación UnderMusic para Android.`
+    : accionRestringida === 'guardar'
+      ? 'Para guardar canciones en tu biblioteca, necesitas utilizar la aplicación UnderMusic para Android.'
+      : 'Para dar Me gusta a las canciones, necesitas utilizar la aplicación UnderMusic para Android.'
 
   return (
     <main className="perfil-publico">
       <header className="perfil-header">
-        <a href="/" className="perfil-logo">
-          ♫ Under<span>Music</span>
-        </a>
-        <span className="perfil-header-texto">
-          Descubre música emergente
-        </span>
+        <Link to="/" className="perfil-logo" aria-label="Ir al inicio de UnderMusic">
+          <img src="/images/logo-undermusic.png" alt="UnderMusic" className="perfil-logo-imagen" />
+        </Link>
+        <Link to="/descargar" className="perfil-header-descarga">Descargar UnderMusic</Link>
       </header>
 
-      {cargando && (
-        <div className="perfil-estado">
-          Cargando perfil del artista...
-        </div>
-      )}
-
+      {cargando && <div className="perfil-estado">Cargando perfil del artista...</div>}
       {!cargando && error && (
         <div className="perfil-estado">
           <h2>No pudimos mostrar este perfil</h2>
           <p>{error}</p>
-          <a href="/">Volver al inicio</a>
+          <Link to="/">Volver al inicio</Link>
         </div>
       )}
 
       {!cargando && artista && (
         <div className="perfil-contenido">
+          <div className="perfil-titulo-pagina">
+            <Link to="/" aria-label="Volver al inicio" className="perfil-volver"><ArrowLeft size={23} /></Link>
+            <span>Perfil del artista</span>
+            <span className="perfil-titulo-espaciador" />
+          </div>
+
           <section className="perfil-portada">
             <div className="perfil-foto-contenedor">
               {artista.fotoPerfil ? (
-                <img
-                  className="perfil-foto"
-                  src={apiUrl(`/api/usuarios/foto-perfil/${artista.fotoPerfil}`)}
-                  alt={`Fotografía de ${artista.nombreArtistico}`}
-                />
+                <img className="perfil-foto" src={apiUrl(`/api/usuarios/foto-perfil/${artista.fotoPerfil}`)} alt={`Fotografía de ${nombreArtista}`} />
               ) : (
-                <div className="perfil-foto-vacia">♫</div>
+                <div className="perfil-foto-vacia"><UserRound size={70} /></div>
               )}
             </div>
-
-            <div className="perfil-identidad">
-              <span className="perfil-etiqueta">
-                ARTISTA EMERGENTE
-              </span>
-
-              <h1>{artista.nombreArtistico}</h1>
-
-              <p className="perfil-usuario">
-                @{artista.nombreUsuario}
-              </p>
-
-              {ubicacion && (
-                <p className="perfil-ubicacion">
-                  📍 {ubicacion}
-                </p>
-              )}
-
-              <div className="perfil-generos">
-                {generos.map((genero) => (
-                  <span key={genero}>{genero}</span>
-                ))}
+            <h1>{nombreArtista}</h1>
+            <p className="perfil-usuario">@{artista.nombreUsuario}</p>
+            <div className="perfil-rol-pais">
+              <span className="perfil-etiqueta">ARTISTA</span>
+              {artista.ubicacion?.pais && <span>{artista.ubicacion.pais}</span>}
+            </div>
+            {ubicacion && (
+              <div className="perfil-estadisticas">
+                <span className="perfil-ubicacion"><MapPin size={20} /> {ubicacion}</span>
               </div>
+            )}
+            <div className="perfil-acciones">
+              <button type="button" className="perfil-seguir" onClick={() => setAccionRestringida('seguir')}>
+                <UserRoundPlus size={19} /> Seguir
+              </button>
+              <button type="button" className="perfil-contactar" onClick={() => setContactoVisible(true)}>
+                <MessageCircleMore size={20} /> Contactar
+              </button>
+              <button type="button" className="perfil-compartir" aria-label="Compartir perfil" onClick={() => void compartir(`${WEB_PUBLICA}/artista/${usuarioId}`, `Perfil de ${nombreArtista}`, `Conoce a ${nombreArtista} en UnderMusic`)}>
+                <Share2 size={22} />
+              </button>
             </div>
           </section>
 
-          <section className="perfil-seccion">
-            <h2>Sobre el artista</h2>
-            <p className="perfil-biografia">
-              {artista.biografia}
-            </p>
-          </section>
-
-          {(artista.instagram ||
-            artista.facebook ||
-            artista.twitter ||
-            artista.correoContacto) && (
+          <div className="perfil-secciones">
             <section className="perfil-seccion">
-              <h2>Conecta con el artista</h2>
-
-              <div className="perfil-redes">
-                {artista.instagram && (
-                  <a
-                    href={artista.instagram}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Instagram ↗
-                  </a>
-                )}
-
-                {artista.facebook && (
-                  <a
-                    href={artista.facebook}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Facebook ↗
-                  </a>
-                )}
-
-                {artista.twitter && (
-                  <a
-                    href={artista.twitter}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    X / Twitter ↗
-                  </a>
-                )}
-
-                {artista.correoContacto && (
-                  <a href={`mailto:${artista.correoContacto}`}>
-                    Correo ✉
-                  </a>
-                )}
-              </div>
+              <h2><UserRound className="perfil-icono-rosa" size={27} /> Sobre el artista</h2>
+              <p className="perfil-biografia">{artista.biografia || 'Este artista aún no ha agregado una biografía.'}</p>
             </section>
-          )}
 
-          
-<section className="perfil-seccion">
-  <h2>Canciones del artista</h2>
+            <section className="perfil-seccion">
+              <h2><Music2 className="perfil-icono-cian" size={27} /> Géneros artísticos</h2>
+              {artista.generoPrincipal && (
+                <>
+                  <p className="perfil-genero-label">Género principal</p>
+                  <div className="perfil-generos"><span className="perfil-genero-principal">{artista.generoPrincipal}</span></div>
+                </>
+              )}
+              {(artista.generosAdicionales || []).length > 0 && (
+                <>
+                  <p className="perfil-genero-label perfil-genero-adicional-label">Géneros adicionales</p>
+                  <div className="perfil-generos">
+                    {artista.generosAdicionales.map((genero) => <span key={genero}>{genero}</span>)}
+                  </div>
+                </>
+              )}
+            </section>
 
-  {cargandoCanciones ? (
-    <p className="perfil-mensaje-canciones">
-      Cargando canciones...
-    </p>
-  ) : errorCanciones ? (
-    <p className="perfil-mensaje-canciones">
-      {errorCanciones}
-    </p>
-  ) : canciones.length === 0 ? (
-    <p className="perfil-mensaje-canciones">
-      Este artista todavía no ha publicado canciones.
-    </p>
-  ) : (
-    <div className="perfil-lista-canciones">
-      {canciones.map((cancion) => (
-        <article className="perfil-cancion" key={cancion.id}>
-          {cancion.portadaId ? (
-            <img
-              className="perfil-cancion-portada"
-              src={apiUrl(`/api/canciones/portadas/${cancion.portadaId}`)}
-              alt={`Portada de ${cancion.titulo}`}
-              loading="lazy"
-            />
-          ) : (
-            <div className="perfil-cancion-portada-vacia">
-              ♫
-            </div>
-          )}
+            <div className="perfil-divisor" />
 
-          <div className="perfil-cancion-informacion">
-            <h3>{cancion.titulo}</h3>
-            <p>
-              {cancion.album || artista.nombreArtistico}
-              {' · '}
-              {cancion.generoPrincipal}
-            </p>
+            <section className="perfil-seccion perfil-seccion-canciones">
+              <h2><Disc3 className="perfil-icono-rosa" size={27} /> Canciones</h2>
+              {cargandoCanciones ? (
+                <p className="perfil-mensaje-canciones">Cargando canciones...</p>
+              ) : errorCanciones ? (
+                <p className="perfil-mensaje-canciones">{errorCanciones}</p>
+              ) : canciones.length === 0 ? (
+                <p className="perfil-mensaje-canciones">Este artista aún no ha publicado canciones.</p>
+              ) : (
+                <div className="perfil-lista-canciones">
+                  {canciones.map((cancion) => (
+                    <article className="perfil-cancion" key={cancion.id}>
+                      {cancion.portadaId ? (
+                        <img className="perfil-cancion-portada" src={apiUrl(`/api/canciones/portadas/${cancion.portadaId}`)} alt={`Portada de ${cancion.titulo}`} loading="lazy" />
+                      ) : artista.fotoPerfil ? (
+                        <img className="perfil-cancion-portada" src={apiUrl(`/api/usuarios/foto-perfil/${artista.fotoPerfil}`)} alt={`Fotografía de ${nombreArtista}`} loading="lazy" />
+                      ) : (
+                        <div className="perfil-cancion-portada-vacia"><Music2 size={28} /></div>
+                      )}
+                      <div className="perfil-cancion-informacion">
+                        <h3>{cancion.titulo}</h3>
+                        <p className="perfil-cancion-genero">{cancion.generoPrincipal}</p>
+                        {cancion.album && <p className="perfil-cancion-album">{cancion.album}</p>}
+                      </div>
+                      <div className="perfil-cancion-acciones">
+                        <button type="button" className="perfil-cancion-accion perfil-cancion-compartir" aria-label={`Compartir ${cancion.titulo}`} onClick={() => void compartir(`${WEB_PUBLICA}/cancion/${cancion.id}`, cancion.titulo, `${cancion.titulo} de ${nombreArtista} en UnderMusic`)}><Share2 size={20} /></button>
+                        <button type="button" className="perfil-cancion-accion perfil-cancion-guardar" aria-label={`Guardar ${cancion.titulo}`} onClick={() => setAccionRestringida('guardar')}><Bookmark size={21} /></button>
+                        <button type="button" className="perfil-cancion-accion perfil-cancion-megusta" aria-label={`Dar Me gusta a ${cancion.titulo}`} onClick={() => setAccionRestringida('me-gusta')}><Heart size={22} /></button>
+                        {cancion.audioId ? (
+                          <Link className="perfil-cancion-accion perfil-cancion-boton" to={`/cancion/${cancion.id}`} aria-label={`Reproducir ${cancion.titulo}`}><Play size={20} fill="currentColor" /></Link>
+                        ) : (
+                          <span className="perfil-cancion-accion perfil-cancion-boton perfil-cancion-inactivo" aria-label="Audio no disponible"><Play size={20} /></span>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
-
-          <a
-            className="perfil-cancion-boton"
-            href={`/cancion/${cancion.id}`}
-            aria-label={`Ver canción ${cancion.titulo}`}
-          >
-            ▶
-          </a>
-        </article>
-      ))}
-    </div>
-  )}
-</section>
-
         </div>
       )}
 
       <footer className="perfil-footer">
-        UnderMusic · Música emergente, conexiones reales
-      </footer>
+  <Link to="/" aria-label="Ir al inicio de UnderMusic">
+    <img
+      src="/images/logo-undermusic.png"
+      alt="UnderMusic"
+      className="perfil-footer-logo"
+    />
+  </Link>
+
+  <p className="perfil-footer-mensaje">
+    Un proyecto hecho para impulsar artistas emergentes.
+  </p>
+</footer>
+
+      {contactoVisible && artista && (
+        <div className="perfil-modal-capa" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setContactoVisible(false) }}>
+          <section className="perfil-contacto-hoja" role="dialog" aria-modal="true" aria-labelledby="perfil-contacto-titulo">
+            <div className="perfil-modal-cabecera">
+              <div><h2 id="perfil-contacto-titulo">Contactar</h2><p>{nombreArtista}</p></div>
+              <button type="button" aria-label="Cerrar contactos" onClick={() => setContactoVisible(false)}><X size={25} /></button>
+            </div>
+            {contactos.length === 0 ? (
+              <p className="perfil-contacto-vacio">Este artista aún no ha agregado métodos de contacto.</p>
+            ) : contactos.map((contacto) => (
+              <a className="perfil-contacto-opcion" key={contacto.nombre} href={contacto.url} target={contacto.icono === 'correo' ? undefined : '_blank'} rel={contacto.icono === 'correo' ? undefined : 'noopener noreferrer'}>
+                {contacto.icono === 'correo' ? <Mail size={25} /> : contacto.icono === 'instagram' ? <ExternalLink size={20} /> : contacto.icono === 'facebook' ? <UsersRound size={25} /> : <span className="perfil-contacto-x">𝕏</span>}
+                <span><strong>{contacto.nombre}</strong><small>{contacto.detalle}</small></span>
+                <ExternalLink size={19} />
+              </a>
+            ))}
+          </section>
+        </div>
+      )}
+
+      {accionRestringida && (
+        <div className="perfil-modal-capa perfil-modal-centrada" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setAccionRestringida(null) }}>
+          <section className="perfil-descarga-modal" role="dialog" aria-modal="true" aria-labelledby="perfil-descarga-titulo">
+            <button type="button" className="perfil-descarga-cerrar" aria-label="Cerrar" onClick={() => setAccionRestringida(null)}><X size={22} /></button>
+            <div className="perfil-descarga-icono"><Music2 size={32} /></div>
+            <h2 id="perfil-descarga-titulo">¡Lleva la música contigo!</h2>
+            <p>{mensajeRestringido}</p>
+            <Link to="/descargar" className="perfil-descarga-enlace">Descargar UnderMusic</Link>
+            <small>Próximamente disponible para Android</small>
+          </section>
+        </div>
+      )}
+
+      {avisoCompartido && (
+        <div className="perfil-aviso" role="status">
+          <span>{avisoCompartido}</span>
+          <button type="button" onClick={() => setAvisoCompartido('')} aria-label="Cerrar aviso"><Check size={19} /></button>
+        </div>
+      )}
     </main>
   )
 }

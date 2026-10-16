@@ -2,7 +2,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import App from './App'
+import Inicio from './pages/Inicio'
 import PerfilArtistaPublico from './pages/PerfilArtistaPublico'
 import CancionPublica from './pages/CancionPublica'
 import './index.css'
@@ -12,7 +12,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<App />} />
+        <Route path="/" element={<Inicio />} />
         <Route path="/descargar" element={<Descargar />} />
         <Route
           path="/artista/:usuarioId"

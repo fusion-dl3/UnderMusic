@@ -45,6 +45,7 @@ export default function CancionPublica() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const [cancion, setCancion] = useState<Cancion | null>(null)
+  const [fotoArtista, setFotoArtista] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
 
@@ -87,6 +88,25 @@ export default function CancionPublica() {
         }
 
         setCancion(datos.cancion)
+setFotoArtista(null)
+
+if (!datos.cancion.portadaId && datos.cancion.usuarioId) {
+  try {
+    const respuestaArtista = await fetch(
+      apiUrl(`/api/perfiles-artista/${datos.cancion.usuarioId}`),
+      { signal: controlador.signal }
+    )
+
+    if (respuestaArtista.ok) {
+      const datosArtista = await respuestaArtista.json()
+      setFotoArtista(datosArtista.artista?.fotoPerfil || null)
+    }
+  } catch (error) {
+    if (!controlador.signal.aborted) {
+      console.error('No se pudo cargar la foto del artista:', error)
+    }
+  }
+}
       } catch (err) {
         if (controlador.signal.aborted) return
 
@@ -200,10 +220,37 @@ async function reiniciarCancion() {
           <ArrowLeft size={25} />
         </Link>
 
-        <div className="um-player-header-center">
-          <span>REPRODUCIENDO</span>
-          <strong>{cancion?.nombreArtistico || 'UnderMusic'}</strong>
-        </div>
+        <div className={`um-player-header-center${reproduciendo ? ' is-playing' : ''}`}>
+          <div className="um-player-listening">
+            <span>ESCUCHANDO</span>
+            <span className="um-player-wave" aria-hidden="true">
+              <i /><i /><i />
+            </span>
+          </div>
+          <div className="um-player-now-playing">
+  {cancion ? (
+    <>
+      <strong>{cancion.titulo}</strong>
+      <span className="um-player-separador"> de </span>
+      <strong>{cancion.nombreArtistico}</strong>
+    </>
+  ) : (
+    <strong>UnderMusic</strong>
+  )}
+</div>
+
+  <Link
+    to="/"
+    className="um-player-logo-link"
+    aria-label="Ir al inicio de UnderMusic"
+  >
+    <img
+      src="/images/logo-undermusic.png"
+      alt="UnderMusic"
+      className="um-player-logo"
+    />
+  </Link>
+</div>
 
         <button
           className="um-player-header-button um-player-share"
@@ -233,16 +280,22 @@ async function reiniciarCancion() {
           <div className="um-player-cover-glow">
             <div className="um-player-cover-frame">
               {cancion.portadaId ? (
-                <img
-                  className="um-player-cover"
-                  src={apiUrl(`/api/canciones/portadas/${cancion.portadaId}`)}
-                  alt={`Portada de ${cancion.titulo}`}
-                />
-              ) : (
-                <div className="um-player-cover-fallback">
-                  <Music2 size={82} />
-                </div>
-              )}
+  <img
+    className="um-player-cover"
+    src={apiUrl(`/api/canciones/portadas/${cancion.portadaId}`)}
+    alt={`Portada de ${cancion.titulo}`}
+  />
+) : fotoArtista ? (
+  <img
+    className="um-player-cover"
+    src={apiUrl(`/api/usuarios/foto-perfil/${fotoArtista}`)}
+    alt={`Fotografía de ${cancion.nombreArtistico}`}
+  />
+) : (
+  <div className="um-player-cover-fallback">
+    <Music2 size={82} />
+  </div>
+)}
             </div>
           </div>
 
@@ -430,7 +483,7 @@ async function reiniciarCancion() {
               to="/descargar"
               className="um-player-download-button"
             >
-              Descubre UnderMusic
+              Descargar UnderMusic
             </Link>
 
             <span className="um-player-modal-note">

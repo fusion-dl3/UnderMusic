@@ -1,324 +1,224 @@
-
 .perfil-publico {
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 75% 10%, #271044 0%, transparent 42%),
-    radial-gradient(ellipse at 10% 55%, #101d3b 0%, transparent 40%),
-    #05030c;
+    radial-gradient(ellipse at 100% 15%, rgba(107, 0, 208, .34), transparent 36%),
+    radial-gradient(ellipse at 0% 45%, rgba(17, 36, 140, .30), transparent 42%),
+    radial-gradient(ellipse at 100% 95%, rgba(0, 149, 244, .25), transparent 34%),
+    #050211;
   color: #fff;
   font-family: Inter, system-ui, sans-serif;
 }
-
+.perfil-publico * { box-sizing: border-box; }
 .perfil-header {
+  position: relative;
   max-width: 1100px;
-  margin: auto;
-  padding: 28px 30px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.perfil-logo {
-  color: white;
-  text-decoration: none;
-  font-size: 24px;
-  font-weight: 800;
-}
-
-.perfil-logo span {
-  color: #c05cff;
-}
-
-.perfil-header-texto {
-  color: #a7a2b8;
-  font-size: 13px;
-}
-
-.perfil-contenido {
-  max-width: 1000px;
-  margin: 45px auto 80px;
-  padding: 0 30px;
-}
-
-.perfil-portada {
-  display: flex;
-  align-items: center;
-  gap: 42px;
-  padding: 42px;
-  border: 1px solid #ffffff1c;
-  border-radius: 26px;
-  background: linear-gradient(135deg, #241137bb, #101426dd);
-  box-shadow: 0 20px 70px #00000045;
-}
-
-.perfil-foto-contenedor {
-  width: 190px;
-  height: 190px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  padding: 4px;
-  background: linear-gradient(135deg, #bb53ff, #24d3ff);
-}
-
-.perfil-foto,
-.perfil-foto-vacia {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  background: #151024;
-}
-
-.perfil-foto-vacia {
+  min-height: 170px;
+  margin: 0 auto;
+  padding: 24px 30px;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 75px;
 }
 
-.perfil-etiqueta {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 2px;
-  color: #c78aff;
+.perfil-header-descarga {
+  position: absolute;
+  right: 30px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.perfil-logo { display: inline-flex; align-items: center; flex-shrink: 0; }
+.perfil-logo-imagen { display: block; width: 240px; height: auto; object-fit: contain; }
+.perfil-header-descarga { text-decoration: none; color: #fff; font-size: 13px; font-weight: 800; padding: 12px 19px; border-radius: 24px; background: rgba(100, 37, 155, .5); border: 1px solid #9656d4; }
+.perfil-header-descarga:hover { background: #7635bd; }
+.perfil-contenido { max-width: 900px; margin: 8px auto 80px; padding: 0 30px; }
+.perfil-titulo-pagina { display: flex; align-items: center; justify-content: space-between; min-height: 64px; margin-bottom: 28px; font-size: 24px; font-weight: 800; }
+.perfil-volver, .perfil-titulo-espaciador { width: 48px; height: 48px; flex-shrink: 0; }
+.perfil-volver { display: grid; place-items: center; border: 1px solid rgba(187, 81, 255, .65); border-radius: 50%; color: #fff; background: rgba(31, 18, 54, .82); }
+.perfil-portada { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.perfil-foto-contenedor { width: 170px; height: 170px; flex-shrink: 0; padding: 3px; border-radius: 43px; background: #7c39ff; margin-bottom: 18px; }
+.perfil-foto, .perfil-foto-vacia { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 40px; object-fit: cover; background: #171026; color: #d8a6ff; }
+.perfil-portada h1 { font-size: 31px; line-height: 1.2; font-weight: 800; margin: 6px 0 8px; overflow-wrap: anywhere; }
+.perfil-usuario { margin: 0; font-size: 16px; font-weight: 600; color: #aaa2b2; }
+.perfil-rol-pais { display: flex; justify-content: center; align-items: center; gap: 13px; margin-top: 12px; color: #c7bfce; font-size: 14px; font-weight: 600; }
+.perfil-etiqueta { padding: 7px 18px; border-radius: 20px; background: rgba(105, 35, 167, .48); border: 1px solid rgba(196, 87, 255, .45); color: #e0a4ff; font-size: 12px; font-weight: 800; letter-spacing: 1.2px; }
+.perfil-estadisticas { margin-top: 23px; display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; }
+.perfil-ubicacion { display: inline-flex; align-items: center; gap: 7px; font-size: 15px; color: #d7d1de; }
+.perfil-ubicacion svg { color: #54e6ff; flex-shrink: 0; }
+.perfil-acciones { display: flex; align-items: center; justify-content: center; width: 100%; max-width: 440px; gap: 12px; margin-top: 20px; }
+.perfil-acciones button { cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 24px; font-size: 15px; font-weight: 800; }
+.perfil-acciones button:not(.perfil-seguir):hover, .perfil-cancion-accion:hover { filter: brightness(1.2); transform: translateY(-1px); }
+.perfil-seguir {
+  flex: 1;
+  min-width: 0;
+  padding: 0 10px;
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  border: 1px solid transparent;
+  animation: none;
 }
 
-.perfil-identidad h1 {
-  font-size: clamp(34px, 5vw, 55px);
-  margin: 12px 0 6px;
-  overflow-wrap: anywhere;
+/* El fondo crece y se contrae, sin escalar el texto ni el icono. */
+.perfil-seguir::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: #8538d4;
+  border: 1px solid #cb8dff;
+  box-shadow: 0 0 10px rgba(170, 80, 255, 0.25);
+  transform: scale(1);
+  transform-origin: center;
+  animation: perfil-seguir-pulso 1.7s ease-in-out infinite;
+  pointer-events: none;
 }
 
-.perfil-usuario {
-  color: #b9a8d1;
-  font-size: 17px;
-  margin: 0 0 16px;
+@keyframes perfil-seguir-pulso {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(170, 80, 255, 0.25);
+  }
+  50% {
+    transform: scale(1.055);
+    box-shadow: 0 0 22px rgba(170, 80, 255, 0.5);
+  }
 }
 
-.perfil-ubicacion {
-  color: #c5c1d3;
-  font-size: 14px;
+.perfil-seguir:hover::before {
+  animation-play-state: paused;
+  transform: scale(1.055);
+  box-shadow: 0 0 24px rgba(170, 80, 255, 0.55);
 }
 
-.perfil-generos {
+@media (prefers-reduced-motion: reduce) {
+  .perfil-seguir::before {
+    animation: none;
+  }
+}
+
+.perfil-contactar { flex: 1; min-width: 0; padding: 0 10px; background: #ad237e; border: 1px solid #ff73c7; }
+.perfil-acciones .perfil-compartir { width: 48px; flex: 0 0 48px; background: rgba(120, 66, 175, .45); border: 1px solid rgba(190, 129, 255, .75); }
+.perfil-secciones { margin-top: 35px; }
+.perfil-seccion { margin-bottom: 31px; }
+.perfil-seccion h2 { display: flex; align-items: center; gap: 11px; margin: 0 0 20px; font-size: 23px; font-weight: 800; }
+.perfil-icono-rosa { color: #e05bff; flex-shrink: 0; }
+.perfil-icono-cian { color: #59dfff; flex-shrink: 0; }
+.perfil-biografia { margin: 0; color: #c9c2d0; font-size: 15px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.perfil-genero-label { margin: 0 0 9px; color: #a8a0b0; font-size: 13px; font-weight: 700; }
+.perfil-genero-adicional-label { margin-top: 18px; }
+.perfil-generos { display: flex; flex-wrap: wrap; gap: 9px; }
+.perfil-generos span { display: inline-block; padding: 9px 16px; border-radius: 20px; color: #ebcfff; font-size: 13px; font-weight: 700; background: rgba(50, 30, 70, .78); border: 1px solid rgba(152, 83, 205, .65); }
+.perfil-generos .perfil-genero-principal { background: rgba(105, 35, 167, .72); border-color: #c65bff; }
+.perfil-divisor { width: 100%; height: 2px; background: rgba(126, 70, 220, .45); margin: 30px 0; }
+.perfil-lista-canciones { display: flex; flex-direction: column; gap: 12px; }
+.perfil-cancion { display: flex; align-items: center; width: 100%; min-height: 82px; gap: 13px; padding: 12px; border-radius: 18px; background: rgba(12, 7, 28, .78); border: 1px solid rgba(137, 63, 209, .52); }
+.perfil-cancion-portada, .perfil-cancion-portada-vacia { width: 58px; height: 58px; flex: 0 0 58px; border-radius: 13px; object-fit: cover; background: rgba(112, 48, 161, .22); }
+.perfil-cancion-portada-vacia { display: grid; place-items: center; color: #d89bff; }
+.perfil-cancion-informacion { flex: 1; min-width: 0; }
+.perfil-cancion-informacion h3 { margin: 0; font-size: 16px; font-weight: 800; overflow-wrap: anywhere; }
+.perfil-cancion-informacion p { overflow-wrap: anywhere; }
+.perfil-cancion-genero { margin: 4px 0 0; color: #d49bff; font-size: 13px; font-weight: 600; }
+.perfil-cancion-album { margin: 3px 0 0; color: #918a9b; font-size: 12px; }
+.perfil-cancion-acciones { display: flex; align-items: center; gap: 9px; }
+.perfil-cancion-accion { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; border-radius: 50%; cursor: pointer; text-decoration: none; transition: filter .15s, transform .15s; }
+.perfil-cancion-compartir { color: #ddb9ff; background: rgba(120, 66, 175, .18); border: 1px solid rgba(190, 129, 255, .45); }
+.perfil-cancion-guardar { color: #9fd9e5; background: rgba(24, 119, 143, .18); border: 1px solid rgba(84, 230, 255, .45); }
+.perfil-cancion-megusta { color: #e7a1c8; background: rgba(145, 35, 100, .18); border: 1px solid rgba(255, 104, 183, .45); }
+.perfil-cancion-boton { color: #fff; background: rgba(137, 63, 209, .72); border: 1px solid rgba(214, 151, 255, .55); margin-left: 8px; }
+.perfil-cancion-inactivo { opacity: .4; cursor: not-allowed; }
+.perfil-mensaje-canciones { color: #aaa3bd; line-height: 1.6; }
+.perfil-estado { max-width: 600px; margin: 100px auto; padding: 30px; text-align: center; color: #d2cce0; }
+.perfil-estado a { color: #c78aff; }
+.perfil-footer {
   display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  margin-top: 20px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 55px 20px 45px;
+  text-align: center;
+  border-top: 1px solid rgba(153, 79, 220, 0.2);
 }
 
-.perfil-generos span {
-  background: #8d43c02b;
-  color: #d7a9ff;
-  border: 1px solid #a85aff55;
-  padding: 7px 14px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
+.perfil-footer-logo {
+  display: block;
+  width: 240px;
+  max-width: 75vw;
+  height: auto;
+  object-fit: contain;
 }
 
-.perfil-seccion {
-  margin-top: 40px;
-  padding: 30px;
-  border: 1px solid #ffffff15;
-  border-radius: 22px;
-  background: #ffffff07;
-}
-
-.perfil-seccion h2,
-.perfil-proximamente h2 {
-  font-size: 21px;
-  margin: 0 0 18px;
-}
-
-.perfil-biografia {
-  color: #c8c4d5;
-  line-height: 1.8;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+.perfil-footer-eslogan {
   margin: 0;
+  color: #c58bff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
 }
 
-.perfil-redes {
-  display: flex;
-  flex-wrap: wrap;
+.perfil-footer-mensaje {
+  margin: 0;
+  color: #b6a8c7;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.perfil-modal-capa { position: fixed; z-index: 1000; inset: 0; background: rgba(0, 0, 0, .75); display: flex; align-items: flex-end; justify-content: center; }
+.perfil-contacto-hoja { width: 100%; max-width: 620px; max-height: 85vh; overflow-y: auto; padding: 24px 22px 28px; border-radius: 28px 28px 0 0; background: #150b25; border: 1px solid #c542a0; box-shadow: 0 -15px 60px rgba(0,0,0,.5); }
+.perfil-modal-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 20px; }
+.perfil-modal-cabecera h2 { margin: 0; font-size: 23px; }
+.perfil-modal-cabecera p { margin: 4px 0 0; color: #c6a6d5; font-size: 14px; }
+.perfil-modal-cabecera button, .perfil-descarga-cerrar { display: grid; place-items: center; cursor: pointer; color: #e9b5ff; border: none; background: transparent; }
+.perfil-contacto-vacio { color: #d8c9df; text-align: center; line-height: 1.6; padding: 24px 0; }
+.perfil-contacto-opcion { display: flex; align-items: center; gap: 14px; padding: 14px 15px; margin-bottom: 11px; color: #ff65be; text-decoration: none; border-radius: 17px; background: rgba(83, 24, 85, .46); border: 1px solid rgba(239, 89, 180, .45); }
+.perfil-contacto-opcion > span:nth-child(2) { flex: 1; min-width: 0; }
+.perfil-contacto-opcion strong { display: block; color: #fff; font-size: 16px; }
+.perfil-contacto-opcion small { display: block; margin-top: 4px; color: #cdb9d4; font-size: 12px; overflow-wrap: anywhere; }
+.perfil-contacto-x { font-size: 24px; }
+.perfil-modal-centrada { align-items: center; padding: 20px; }
+.perfil-descarga-modal { position: relative; width: 100%; max-width: 420px; padding: 30px 26px 26px; border-radius: 25px; border: 1px solid #ba4ee4; background: #160b28; text-align: center; }
+.perfil-descarga-cerrar { position: absolute; right: 15px; top: 15px; }
+.perfil-descarga-icono { width: 68px; height: 68px; margin: 0 auto 18px; border-radius: 50%; display: grid; place-items: center; background: rgba(161, 49, 135, .26); color: #ff79bc; }
+.perfil-descarga-modal h2 { font-size: 21px; margin: 0 0 12px; }
+.perfil-descarga-modal p { color: #c9bed5; line-height: 1.6; margin: 0 0 23px; }
+.perfil-descarga-enlace { display: block; padding: 15px; color: #fff; font-weight: 800; text-decoration: none; border-radius: 24px; background: #812cc1; border: 1px solid #c875f5; }
+.perfil-descarga-modal small { display: block; margin-top: 14px; color: #b7a7c9; }
+.perfil-aviso { position: fixed; z-index: 1200; left: 50%; bottom: 25px; transform: translateX(-50%); display: flex; align-items: center; gap: 15px; max-width: calc(100% - 30px); padding: 14px 18px; border: 1px solid #bd64fa; border-radius: 15px; background: #26103d; color: #fff; box-shadow: 0 10px 35px #0009; }
+.perfil-aviso button { color: #eacaff; background: transparent; border: 0; cursor: pointer; }
+@media (max-width: 650px) {
+  .perfil-header {
+  min-height: 150px;
+  padding: 20px 16px;
+  flex-direction: column;
   gap: 12px;
 }
 
-.perfil-redes a {
-  color: #e4caff;
-  text-decoration: none;
-  border: 1px solid #a85aff55;
-  background: #a85aff15;
-  padding: 12px 20px;
-  border-radius: 12px;
-  font-size: 14px;
-}
-
-.perfil-redes a:hover {
-  background: #a85aff30;
-}
-
-.perfil-proximamente {
-  margin-top: 40px;
+.perfil-header-descarga {
+  position: static;
+  transform: none;
+  right: auto;
+  top: auto;
+  max-width: none;
   text-align: center;
-  padding: 55px 25px;
-  border: 1px dashed #a85aff55;
-  border-radius: 22px;
 }
-
-.perfil-proximamente > span {
-  color: #c05cff;
-  font-size: 42px;
+  .perfil-logo-imagen {
+  width: 240px;
+  max-width: 100%;
 }
-
-.perfil-proximamente p {
-  color: #a7a2b8;
-  line-height: 1.6;
+  .perfil-header-descarga { padding: 10px 12px; font-size: 11px; }
+  .perfil-contenido { padding: 0 16px; }
+  .perfil-titulo-pagina { font-size: 21px; margin-bottom: 20px; }
+  .perfil-seccion h2 { font-size: 21px; }
+  .perfil-cancion { gap: 9px; padding: 10px; }
+  .perfil-cancion-acciones { gap: 6px; }
+  .perfil-cancion-accion { width: 36px; height: 36px; flex-basis: 36px; }
+  .perfil-cancion-boton { margin-left: 0; }
 }
-
-.perfil-estado {
-  max-width: 600px;
-  margin: 110px auto;
-  padding: 30px;
-  text-align: center;
-  color: #d2cce0;
-}
-
-.perfil-estado a {
-  color: #c78aff;
-}
-
-.perfil-footer {
-  text-align: center;
-  padding: 35px 20px;
-  color: #79748a;
-  font-size: 12px;
-}
-
-@media (max-width: 650px) {
-  .perfil-header {
-    padding: 22px 20px;
-  }
-
-  .perfil-header-texto {
-    display: none;
-  }
-
-  .perfil-contenido {
-    margin-top: 15px;
-    padding: 0 16px;
-  }
-
-  .perfil-portada {
-    flex-direction: column;
-    text-align: center;
-    padding: 30px 18px;
-    gap: 22px;
-  }
-
-  .perfil-foto-contenedor {
-    width: 150px;
-    height: 150px;
-  }
-
-  .perfil-generos {
-    justify-content: center;
-  }
-
-  .perfil-seccion {
-    padding: 24px 20px;
-  }
-}
-
-
-.perfil-lista-canciones {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.perfil-cancion {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 14px;
-  background: #ffffff08;
-  border: 1px solid #ffffff14;
-  border-radius: 16px;
-}
-
-.perfil-cancion-portada,
-.perfil-cancion-portada-vacia {
-  width: 72px;
-  height: 72px;
-  flex-shrink: 0;
-  border-radius: 12px;
-  object-fit: cover;
-}
-
-.perfil-cancion-portada-vacia {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #502078, #18294d);
-  color: #d5a4ff;
-  font-size: 30px;
-}
-
-.perfil-cancion-informacion {
-  flex: 1;
-  min-width: 0;
-}
-
-.perfil-cancion-informacion h3 {
-  margin: 0 0 7px;
-  font-size: 17px;
-  overflow-wrap: anywhere;
-}
-
-.perfil-cancion-informacion p {
-  margin: 0;
-  color: #aaa3bd;
-  font-size: 13px;
-}
-
-.perfil-cancion-boton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #a44eff, #6244c9);
-  color: #fff;
-  text-decoration: none;
-  font-size: 16px;
-}
-
-.perfil-cancion-boton:hover {
-  filter: brightness(1.2);
-}
-
-.perfil-mensaje-canciones {
-  color: #aaa3bd;
-  line-height: 1.6;
-}
-
-@media (max-width: 650px) {
-  .perfil-cancion {
-    gap: 12px;
-    padding: 10px;
-  }
-
-  .perfil-cancion-portada,
-  .perfil-cancion-portada-vacia {
-    width: 58px;
-    height: 58px;
-  }
-
-  .perfil-cancion-informacion h3 {
-    font-size: 15px;
-  }
+@media (max-width: 400px) {
+  .perfil-cancion { flex-wrap: wrap; }
+  .perfil-cancion-informacion { flex-basis: calc(100% - 72px); }
+  .perfil-cancion-acciones { width: 100%; justify-content: flex-end; }
+  .perfil-acciones { gap: 7px; }
+  .perfil-acciones button { font-size: 13px; }
+  .perfil-acciones .perfil-compartir { flex-basis: 44px; width: 44px; }
 }

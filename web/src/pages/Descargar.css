@@ -335,3 +335,45 @@
     transition: none;
   }
 }
+
+/* Logo oficial del pie de página */
+
+.um-download-footer-logo {
+  display: block;
+  width: min(75vw, 260px);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(156, 65, 255, 0.2));
+}
+
+.um-download-footer a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+/* Efecto de pulso suave del aviso de Android */
+
+.um-download-android {
+  animation: um-download-pulse 2.5s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes um-download-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+/* Accesibilidad: respetar movimiento reducido */
+
+@media (prefers-reduced-motion: reduce) {
+  .um-download-android {
+    animation: none;
+  }
+}

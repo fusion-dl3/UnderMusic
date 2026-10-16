@@ -206,11 +206,16 @@ export default function Descargar() {
       </section>
 
       <footer className="um-download-footer">
-        <Music2 size={23} />
-        <strong>UnderMusic</strong>
-        <span>Descubre · Conecta · Escucha</span>
-        <p>Un proyecto que nace para impulsar la música emergente.</p>
-      </footer>
+  <Link to="/" aria-label="Ir al inicio de UnderMusic">
+    <img
+      src="/images/logo-undermusic.png"
+      alt="UnderMusic - Descubre, Conecta, Escucha"
+      className="um-download-footer-logo"
+    />
+  </Link>
+
+  <p>Un proyecto hecho para impulsar artistas emergentes.</p>
+</footer>
     </main>
   )
 }

@@ -1,0 +1,186 @@
+.um-home-page {
+  min-height: 100vh;
+  color: #fff;
+  background-color: #05030c;
+  background-image:
+    linear-gradient(
+      rgba(3, 2, 12, 0.48),
+      rgba(3, 2, 12, 0.78)
+    ),
+    url('/images/fondo-desktop.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.um-home-page * {
+  box-sizing: border-box;
+}
+
+.um-home-header {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 22px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.um-home-brand img {
+  display: block;
+  width: 185px;
+  height: auto;
+}
+
+.um-home-header-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 12px 18px;
+  border-radius: 13px;
+  border: 1px solid rgba(185, 118, 255, 0.5);
+  background: rgba(91, 38, 156, 0.38);
+  color: #fff;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 0.2s;
+}
+
+.um-home-header-download:hover {
+  background: rgba(139, 62, 217, 0.55);
+}
+
+.um-home-hero {
+  min-height: calc(100vh - 115px);
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 70px 25px 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.um-home-eyebrow {
+  color: #65e4ff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 3px;
+}
+
+.um-home-hero h1 {
+  max-width: 900px;
+  margin: 25px 0;
+  font-size: clamp(40px, 6vw, 74px);
+  font-weight: 850;
+  line-height: 1.12;
+  letter-spacing: -2px;
+}
+
+.um-home-hero h1 span {
+  color: #d176ff;
+}
+
+.um-home-hero p {
+  max-width: 670px;
+  margin: 0;
+  color: #d1c6df;
+  font-size: clamp(16px, 2vw, 19px);
+  line-height: 1.8;
+}
+
+.um-home-main-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 38px;
+  padding: 18px 30px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #a24eff, #6936d1);
+  box-shadow: 0 0 30px rgba(156, 67, 255, 0.35);
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 800;
+  animation: um-home-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes um-home-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+.um-home-availability {
+  margin-top: 20px;
+  color: #b8a9ca;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .um-home-page {
+    background-image:
+      linear-gradient(
+        rgba(3, 2, 12, 0.45),
+        rgba(3, 2, 12, 0.78)
+      ),
+      url('/images/fondo-app.png');
+    background-position: center top;
+    background-attachment: scroll;
+  }
+
+  .um-home-header {
+    padding: 18px 20px;
+  }
+
+  .um-home-brand img {
+    width: 135px;
+  }
+
+  .um-home-header-download {
+    padding: 11px 12px;
+    font-size: 11px;
+  }
+
+  .um-home-hero {
+    min-height: calc(100vh - 90px);
+    padding: 50px 20px 85px;
+  }
+
+  .um-home-hero h1 {
+    letter-spacing: -1px;
+  }
+
+  .um-home-main-button {
+    padding: 16px 20px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  .um-home-header-download {
+    max-width: 165px;
+    text-align: center;
+  }
+
+  .um-home-eyebrow {
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .um-home-main-button {
+    animation: none;
+  }
+}
