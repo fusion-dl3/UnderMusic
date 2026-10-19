@@ -160,7 +160,7 @@ export default function EditarPerfilArtistaScreen() {
       }
 
       const respuesta = await fetch(
-        'http://192.168.1.14:3000/api/perfiles-artista/me',
+        'http://192.168.1.5:3000/api/perfiles-artista/me',
         {
           method: 'GET',
           headers: {
@@ -343,7 +343,7 @@ export default function EditarPerfilArtistaScreen() {
       }
 
       const respuesta = await fetch(
-        'http://192.168.1.14:3000/api/perfiles-artista/me',
+        'http://192.168.1.5:3000/api/perfiles-artista/me',
         {
           method: 'PATCH',
           headers: {

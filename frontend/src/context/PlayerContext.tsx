@@ -12,13 +12,14 @@ import {
   useAudioPlayerStatus,
 } from 'expo-audio';
 
-const API_URL = 'http://192.168.1.14:3000';
+const API_URL = 'http://192.168.1.5:3000';
 
 export type CancionReproductor = {
   id: string;
   audioId: string;
   titulo: string;
   nombreArtista: string;
+  usuarioId?: string;
   portadaId: string | null;
   fotoArtista: string | null;
 };

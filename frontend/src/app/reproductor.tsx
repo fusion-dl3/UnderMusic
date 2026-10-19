@@ -1,9 +1,11 @@
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import {
@@ -11,6 +13,9 @@ import {
   Alert,
   GestureResponderEvent,
   Image,
+  Animated,
+  AccessibilityInfo,
+  Easing,
   ImageBackground,
   Pressable,
   Share,
@@ -22,7 +27,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePlayer } from '@/context/PlayerContext';
 
-const API_URL = 'http://192.168.1.14:3000';
+const API_URL = 'http://192.168.1.5:3000';
 
 function formatearTiempo(segundos: number) {
   if (
@@ -43,6 +48,194 @@ function formatearTiempo(segundos: number) {
   return `${minutos}:${segundosRestantes
     .toString()
     .padStart(2, '0')}`;
+}
+
+function BarrasEscuchando({
+  reproduciendo,
+}: {
+  reproduciendo: boolean;
+}) {
+  const barras = useRef([
+    new Animated.Value(1),
+    new Animated.Value(1),
+    new Animated.Value(1),
+  ]).current;
+
+  const [reducirMovimiento, setReducirMovimiento] = useState(true);
+
+  useEffect(() => {
+    let activo = true;
+
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((valor) => {
+        if (activo) setReducirMovimiento(valor);
+      })
+      .catch(() => {
+        if (activo) setReducirMovimiento(true);
+      });
+
+    const suscripcion =
+      AccessibilityInfo.addEventListener(
+        'reduceMotionChanged',
+        setReducirMovimiento
+      );
+
+    return () => {
+      activo = false;
+      suscripcion.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const animaciones = barras.map((barra, indice) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(indice * 260),
+          Animated.timing(barra, {
+            toValue: 2.6,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(barra, {
+            toValue: 1,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.delay((2 - indice) * 260),
+        ])
+      )
+    );
+
+    if (reproduciendo && !reducirMovimiento) {
+      animaciones.forEach((animacion) => animacion.start());
+    } else {
+      barras.forEach((barra) => barra.setValue(1));
+    }
+
+    return () => {
+      animaciones.forEach((animacion) => animacion.stop());
+    };
+  }, [reproduciendo, reducirMovimiento, barras]);
+
+  return (
+    <View
+      style={styles.barrasEscuchando}
+      accessible={false}
+      importantForAccessibility="no"
+    >
+      {barras.map((barra, indice) => (
+  <Animated.View
+    key={indice}
+    style={[
+      styles.barraEscuchando,
+      {
+        transform: [{ scaleY: barra }],
+      },
+    ]}
+  >
+    <LinearGradient
+      colors={['#55DFFF', '#D15AFF']}
+      start={{ x: 0.5, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
+      style={styles.degradadoBarra}
+    />
+  </Animated.View>
+))}
+    </View>
+  );
+}
+
+function TextoEscuchando({
+  titulo,
+  artista,
+  reproduciendo,
+}: {
+  titulo: string;
+  artista: string;
+  reproduciendo: boolean;
+}) {
+  const escala = useRef(new Animated.Value(1)).current;
+  const [reducirMovimiento, setReducirMovimiento] = useState(true);
+
+  useEffect(() => {
+    let activo = true;
+
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((valor) => {
+        if (activo) setReducirMovimiento(valor);
+      })
+      .catch(() => {
+        if (activo) setReducirMovimiento(true);
+      });
+
+    const suscripcion = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReducirMovimiento
+    );
+
+    return () => {
+      activo = false;
+      suscripcion.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    escala.setValue(1);
+
+    if (!reproduciendo || reducirMovimiento) {
+      return;
+    }
+
+    const animacion = Animated.loop(
+      Animated.sequence([
+        Animated.timing(escala, {
+          toValue: 1.03,
+          duration: 1250,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(escala, {
+          toValue: 1,
+          duration: 1250,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    animacion.start();
+
+    return () => {
+      animacion.stop();
+      escala.setValue(1);
+    };
+  }, [reproduciendo, reducirMovimiento, escala]);
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ scale: escala }],
+        maxWidth: '100%',
+      }}
+    >
+      <Text
+        style={styles.headerArtist}
+        numberOfLines={2}
+      >
+        <Text style={{ fontWeight: '800' }}>
+          {titulo}
+        </Text>
+        <Text style={{ fontWeight: '400', letterSpacing: 0 }}>
+          {' de '}
+        </Text>
+        <Text style={{ fontWeight: '800' }}>
+          {artista}
+        </Text>
+      </Text>
+    </Animated.View>
+  );
 }
 
 export default function ReproductorScreen() {
@@ -354,17 +547,20 @@ const progresoVisible =
             </Pressable>
 
             <View style={styles.headerCenter}>
-              <Text style={styles.headerLabel}>
-                REPRODUCIENDO
-              </Text>
+  <View style={styles.headerListening}>
+  <Text style={styles.headerLabel}>
+    ESCUCHANDO
+  </Text>
 
-              <Text
-                style={styles.headerArtist}
-                numberOfLines={1}
-              >
-                {cancionActual.nombreArtista}
-              </Text>
-            </View>
+  <BarrasEscuchando reproduciendo={reproduciendo} />
+</View>
+
+  <TextoEscuchando
+  titulo={cancionActual.titulo}
+  artista={cancionActual.nombreArtista}
+  reproduciendo={reproduciendo}
+/>
+</View>
 
             <Pressable
               style={styles.headerShareButton}
@@ -402,9 +598,25 @@ const progresoVisible =
                 <Text style={styles.songTitle} numberOfLines={2}>
                   {cancionActual.titulo}
                 </Text>
-                <Text style={styles.artistName} numberOfLines={1}>
-                  {cancionActual.nombreArtista}
-                </Text>
+                <Pressable
+  disabled={!cancionActual.usuarioId}
+  onPress={() => {
+    if (!cancionActual.usuarioId) return;
+
+    router.dismissTo({
+  pathname: '/artista/[usuarioId]',
+  params: {
+    usuarioId: cancionActual.usuarioId,
+  },
+});
+  }}
+  accessibilityRole="button"
+  accessibilityLabel={`Ver perfil de ${cancionActual.nombreArtista}`}
+>
+  <Text style={styles.artistName} numberOfLines={1}>
+    {cancionActual.nombreArtista}
+  </Text>
+</Pressable>
               </View>
               <View style={styles.songActions}>
                 <Pressable
@@ -610,6 +822,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
   },
+
+headerListening: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+},
+
+barrasEscuchando: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 3,
+  height: 14,
+},
+
+barraEscuchando: {
+  width: 3,
+  height: 5,
+  borderRadius: 3,
+},
+
+degradadoBarra: {
+  width: '100%',
+  height: '100%',
+  borderRadius: 3,
+},
 
   headerLabel: {
     color: '#C4BCCB',

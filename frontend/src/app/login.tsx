@@ -38,7 +38,7 @@ export default function LoginScreen() {
       setIniciandoSesion(true);
 
       const respuesta = await fetch(
-        'http://192.168.1.14:3000/api/usuarios/login',
+        'http://192.168.1.5:3000/api/usuarios/login',
         {
           method: 'POST',
           headers: {

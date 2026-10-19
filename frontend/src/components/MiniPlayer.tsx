@@ -10,7 +10,7 @@ import {
 
 import { usePlayer } from '@/context/PlayerContext';
 
-const API_URL = 'http://192.168.1.14:3000';
+const API_URL = 'http://192.168.1.5:3000';
 
 export function MiniPlayer() {
   const {

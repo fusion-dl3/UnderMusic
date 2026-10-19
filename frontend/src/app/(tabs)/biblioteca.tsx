@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 
-const API_URL = 'http://192.168.1.14:3000';
+const API_URL = 'http://192.168.1.5:3000';
 
 type FiltroBiblioteca = 'todos' | 'artistas' | 'gustas' | 'guardadas';
 
@@ -300,6 +300,7 @@ export default function BibliotecaScreen() {
         audioId: c.audioId as string,
         titulo: c.titulo,
         nombreArtista: c.nombreArtista || 'Artista',
+        usuarioId: c.usuarioId,
         portadaId: c.portadaId,
         fotoArtista: c.fotoArtista || null,
       }));

@@ -98,7 +98,7 @@ export default function PerfilScreen() {
       }
 
       const respuestaUsuario = await fetch(
-        'http://192.168.1.14:3000/api/usuarios/me',
+        'http://192.168.1.5:3000/api/usuarios/me',
         {
           method: 'GET',
           headers: {
@@ -123,7 +123,7 @@ export default function PerfilScreen() {
 
       if (usuarioCargado.rol === 'artista') {
         const respuestaPerfilArtista = await fetch(
-          'http://192.168.1.14:3000/api/perfiles-artista/me',
+          'http://192.168.1.5:3000/api/perfiles-artista/me',
           {
             method: 'GET',
             headers: {
@@ -151,7 +151,7 @@ export default function PerfilScreen() {
         // Si falla, no interrumpimos la carga del perfil ni de las canciones.
         try {
           const respuestaSeguidores = await fetch(
-            `http://192.168.1.14:3000/api/seguimientos/artistas/${usuarioCargado.id}/estado`,
+            `http://192.168.1.5:3000/api/seguimientos/artistas/${usuarioCargado.id}/estado`,
             {
               method: 'GET',
               headers: {
@@ -175,7 +175,7 @@ export default function PerfilScreen() {
           console.warn('Error al consultar seguidores:', errorSeguidores);
         }
                 const respuestaCanciones = await fetch(
-          'http://192.168.1.14:3000/api/canciones/me',
+          'http://192.168.1.5:3000/api/canciones/me',
           {
             method: 'GET',
             headers: {
@@ -308,7 +308,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                 {usuario.fotoPerfil ? (
                   <Image
                     source={{
-                      uri: `http://192.168.1.14:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
+                      uri: `http://192.168.1.5:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
                     }}
                     style={styles.avatarImage}
                     resizeMode="cover"
@@ -616,7 +616,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                           {cancion.portadaId ? (
                             <Image
                               source={{
-                                uri: `http://192.168.1.14:3000/api/canciones/portadas/${cancion.portadaId}`,
+                                uri: `http://192.168.1.5:3000/api/canciones/portadas/${cancion.portadaId}`,
                               }}
                               style={styles.songCover}
                               resizeMode="cover"
@@ -624,7 +624,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                           ) : usuario.fotoPerfil ? (
                             <Image
                               source={{
-                                uri: `http://192.168.1.14:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
+                                uri: `http://192.168.1.5:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
                               }}
                               style={styles.songCover}
                               resizeMode="cover"
@@ -692,6 +692,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                                     nombreArtista:
                                       perfilArtista?.nombreArtistico ||
                                       usuario.nombreUsuario,
+                                      usuarioId: usuario.id,
                                     portadaId: item.portadaId,
                                     fotoArtista:
                                       usuario.fotoPerfil || null,
