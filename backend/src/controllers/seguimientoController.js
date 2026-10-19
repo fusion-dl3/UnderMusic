@@ -333,9 +333,64 @@ async function obtenerMisArtistasSeguidos(req, res) {
   }
 }
 
+async function obtenerCantidadSeguidoresPublica(req, res) {
+  try {
+    const { artistaId } = req.params;
+
+    if (!ObjectId.isValid(artistaId)) {
+      return res.status(400).json({
+        message: 'El identificador del artista no es válido'
+      });
+    }
+
+    const artistaObjectId = new ObjectId(artistaId);
+
+    const usuarios = getUsuariosCollection();
+    const perfilesArtista = getPerfilesArtistaCollection();
+    const seguimientos = getSeguimientosCollection();
+
+    const artista = await usuarios.findOne({
+      _id: artistaObjectId,
+      rol: 'artista'
+    });
+
+    if (!artista) {
+      return res.status(404).json({
+        message: 'No se encontró el artista'
+      });
+    }
+
+    const perfilArtista = await perfilesArtista.findOne({
+      usuarioId: artistaObjectId,
+      perfilCompleto: true
+    });
+
+    if (!perfilArtista) {
+      return res.status(404).json({
+        message: 'El perfil artístico no está disponible'
+      });
+    }
+
+    const cantidadSeguidores = await seguimientos.countDocuments({
+      artistaId: artistaObjectId
+    });
+
+    return res.status(200).json({
+      cantidadSeguidores
+    });
+  } catch (error) {
+    console.error('Error al obtener cantidad pública de seguidores:', error);
+
+    return res.status(500).json({
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 module.exports = {
   seguirArtista,
   dejarDeSeguirArtista,
   obtenerEstadoSeguimiento,
-  obtenerMisArtistasSeguidos
+  obtenerMisArtistasSeguidos,
+  obtenerCantidadSeguidoresPublica
 };

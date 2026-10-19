@@ -4,7 +4,8 @@ const {
   seguirArtista,
   dejarDeSeguirArtista,
   obtenerEstadoSeguimiento,
-  obtenerMisArtistasSeguidos
+  obtenerMisArtistasSeguidos,
+  obtenerCantidadSeguidoresPublica
 } = require('../controllers/seguimientoController');
 
 const {
@@ -35,6 +36,11 @@ router.get(
   '/artistas/:artistaId/estado',
   verificarToken,
   obtenerEstadoSeguimiento
+);
+
+router.get(
+  '/artistas/:artistaId/seguidores',
+  obtenerCantidadSeguidoresPublica
 );
 
 module.exports = router;

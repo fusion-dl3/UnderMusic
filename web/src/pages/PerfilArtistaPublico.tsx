@@ -62,6 +62,7 @@ function urlRedSocial(valor: string | undefined, dominios: string[]): string | n
 export default function PerfilArtistaPublico() {
   const { usuarioId } = useParams<{ usuarioId: string }>()
   const [artista, setArtista] = useState<Artista | null>(null)
+  const [cantidadSeguidores, setCantidadSeguidores] = useState<number | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [canciones, setCanciones] = useState<Cancion[]>([])
@@ -102,6 +103,44 @@ export default function PerfilArtistaPublico() {
       }
     }
     void cargarArtista()
+    return () => controlador.abort()
+  }, [usuarioId])
+
+    useEffect(() => {
+    if (!usuarioId) {
+      setCantidadSeguidores(null)
+      return
+    }
+
+    const controlador = new AbortController()
+
+    async function cargarSeguidores() {
+      setCantidadSeguidores(null)
+
+      try {
+        const respuesta = await fetch(
+          apiUrl(`/api/seguimientos/artistas/${usuarioId}/seguidores`),
+          { signal: controlador.signal }
+        )
+
+        if (!respuesta.ok) {
+          throw new Error('No se pudo obtener la cantidad de seguidores')
+        }
+
+        const datos = await respuesta.json()
+
+        if (!controlador.signal.aborted) {
+          setCantidadSeguidores(datos.cantidadSeguidores)
+        }
+      } catch (error) {
+        if (!controlador.signal.aborted) {
+          console.error('Error al cargar seguidores:', error)
+        }
+      }
+    }
+
+    void cargarSeguidores()
+
     return () => controlador.abort()
   }, [usuarioId])
 
@@ -286,11 +325,20 @@ function renderizarMenuCompartir(id: string) {
               <span className="perfil-etiqueta">ARTISTA</span>
               {artista.ubicacion?.pais && <span>{artista.ubicacion.pais}</span>}
             </div>
-            {ubicacion && (
-              <div className="perfil-estadisticas">
-                <span className="perfil-ubicacion"><MapPin size={20} /> {ubicacion}</span>
-              </div>
-            )}
+            <div className="perfil-estadisticas">
+  {ubicacion && (
+    <span className="perfil-ubicacion">
+      <MapPin size={20} /> {ubicacion}
+    </span>
+  )}
+
+  {cantidadSeguidores !== null && (
+    <span className="perfil-seguidores">
+      <UsersRound size={20} />
+      {cantidadSeguidores} {cantidadSeguidores === 1 ? 'seguidor' : 'seguidores'}
+    </span>
+  )}
+</div>
             <div className="perfil-acciones">
               <button type="button" className="perfil-seguir" onClick={() => setAccionRestringida('seguir')}>
                 <UserRoundPlus size={19} /> Seguir
