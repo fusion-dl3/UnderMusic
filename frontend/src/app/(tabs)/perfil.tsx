@@ -353,7 +353,14 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
 
             <View style={styles.profileStatsRow}>
               <View style={styles.locationRow}>
-                <Ionicons name="location-outline" size={24} color="#54E6FF" />
+                <View style={styles.locationIcon}>
+                  <Ionicons
+  name="location-outline"
+  size={24}
+  color="#54E6FF"
+  style={{ transform: [{ translateY: -6 }] }}
+/>
+                </View>
                 <Text style={styles.locationText}>
                   {usuario.ubicacion.comuna}, {usuario.ubicacion.region}
                 </Text>
@@ -906,7 +913,7 @@ const styles = StyleSheet.create({
 
   headerActions: {
     position: 'absolute',
-    right: 0,
+    right: -8,
     top: 4,
     flexDirection: 'row',
     gap: 10,
@@ -1027,8 +1034,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 1,
     minWidth: 0,
-    gap: 8,
+    gap: 5,
   },
+
+  locationIcon: { justifyContent: 'center', alignItems: 'center', transform: [{ translateY: 1 }] },
 
   locationText: {
     flexShrink: 1,

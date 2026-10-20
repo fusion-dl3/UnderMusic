@@ -7,7 +7,9 @@ const {
   obtenerCancionesArtista,
   obtenerCancionPublica,
   obtenerPortadaCancion,
-  obtenerAudioCancion
+  obtenerAudioCancion,
+  obtenerGenerosDisponibles,
+  obtenerArtistasPorGenero
 } = require('../controllers/cancionController');
 
 const {
@@ -53,6 +55,16 @@ router.patch(
   verificarToken,
   subirArchivosCancion,
   subirPortadaCancion
+);
+
+router.get(
+  '/generos/disponibles',
+  obtenerGenerosDisponibles
+);
+
+router.get(
+  '/generos/artistas',
+  obtenerArtistasPorGenero
 );
 
 router.get(

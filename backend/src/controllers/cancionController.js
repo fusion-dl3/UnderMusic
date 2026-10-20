@@ -976,6 +976,162 @@ async function obtenerCancionPublica(req, res) {
 }
 
 
+async function obtenerGenerosDisponibles(req, res) {
+  try {
+    const canciones = getCancionesCollection();
+    const perfilesArtista = getPerfilesArtistaCollection();
+
+    // Solo consideramos artistas con perfiles completos.
+    const perfilesCompletos = await perfilesArtista
+      .find(
+        { perfilCompleto: true },
+        { projection: { usuarioId: 1 } }
+      )
+      .toArray();
+
+    const idsArtistas = perfilesCompletos
+      .map((perfil) => perfil.usuarioId)
+      .filter(Boolean);
+
+    if (idsArtistas.length === 0) {
+      return res.status(200).json({ generos: [] });
+    }
+
+    const cancionesPublicadas = await canciones
+      .find(
+        { usuarioId: { $in: idsArtistas } },
+        {
+          projection: {
+            usuarioId: 1,
+            generoPrincipal: 1,
+            generosSecundarios: 1
+          }
+        }
+      )
+      .toArray();
+
+    // Cada género almacena artistas únicos, no cantidad de canciones.
+    const artistasPorGenero = new Map();
+
+    for (const cancion of cancionesPublicadas) {
+      const generos = [
+        cancion.generoPrincipal,
+        ...(Array.isArray(cancion.generosSecundarios)
+          ? cancion.generosSecundarios
+          : [])
+      ];
+
+      for (const genero of new Set(generos)) {
+        if (
+          typeof genero !== 'string' ||
+          !GENEROS_MUSICALES.includes(genero)
+        ) {
+          continue;
+        }
+
+        if (!artistasPorGenero.has(genero)) {
+          artistasPorGenero.set(genero, new Set());
+        }
+
+        artistasPorGenero
+          .get(genero)
+          .add(String(cancion.usuarioId));
+      }
+    }
+
+    const generos = [...artistasPorGenero.entries()]
+      .map(([nombre, artistas]) => ({
+        nombre,
+        cantidadArtistas: artistas.size
+      }))
+      .sort((a, b) => {
+        if (b.cantidadArtistas !== a.cantidadArtistas) {
+          return b.cantidadArtistas - a.cantidadArtistas;
+        }
+
+        return a.nombre.localeCompare(b.nombre, 'es');
+      });
+
+    return res.status(200).json({ generos });
+  } catch (error) {
+    console.error(
+      'Error al obtener géneros disponibles:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'No fue posible obtener los géneros disponibles'
+    });
+  }
+}
+
+
+async function obtenerArtistasPorGenero(req, res) {
+  try {
+    const { genero } = req.query;
+
+    if (
+      typeof genero !== 'string' ||
+      !GENEROS_MUSICALES.includes(genero)
+    ) {
+      return res.status(400).json({
+        message: 'Debes indicar un género musical válido'
+      });
+    }
+
+    const canciones = getCancionesCollection();
+    const perfilesArtista = getPerfilesArtistaCollection();
+
+    // Buscar canciones publicadas de este género,
+    // tanto principal como secundario.
+    const usuarioIds = await canciones.distinct(
+      'usuarioId',
+      {
+        $or: [
+          { generoPrincipal: genero },
+          { generosSecundarios: genero }
+        ]
+      }
+    );
+
+    if (usuarioIds.length === 0) {
+      return res.status(200).json({
+        usuarioIds: []
+      });
+    }
+
+    // Incluir únicamente artistas con perfiles completos.
+    const perfiles = await perfilesArtista
+      .find(
+        {
+          usuarioId: { $in: usuarioIds },
+          perfilCompleto: true
+        },
+        {
+          projection: { usuarioId: 1 }
+        }
+      )
+      .toArray();
+
+    const idsValidos = perfiles.map(
+      (perfil) => perfil.usuarioId.toString()
+    );
+
+    return res.status(200).json({
+      usuarioIds: idsValidos
+    });
+  } catch (error) {
+    console.error(
+      'Error al obtener artistas por género:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'No fue posible obtener los artistas del género'
+    });
+  }
+}
+
 
 module.exports = {
   publicarCancion,
@@ -984,5 +1140,7 @@ module.exports = {
   obtenerCancionesArtista,
   obtenerCancionPublica,
   obtenerPortadaCancion,
-  obtenerAudioCancion
+  obtenerAudioCancion,
+  obtenerGenerosDisponibles,
+  obtenerArtistasPorGenero
 };

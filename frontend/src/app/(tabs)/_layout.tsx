@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { MiniPlayer } from '@/components/MiniPlayer';
 
@@ -52,6 +52,12 @@ export default function TabsLayout() {
             name="inicio"
             options={{
               title: 'Inicio',
+              tabBarLabel: ({ focused, color }) => (
+                <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: 28 }}>
+                  <Text style={{ color, fontSize: 12, fontWeight: '600' }}>Inicio</Text>
+                  {focused ? <IndicadorActivo /> : null}
+                </View>
+              ),
               tabBarIcon: ({ color, focused }) => (
                 <View style={styles.iconContainer}>
                   <Ionicons
@@ -63,10 +69,6 @@ export default function TabsLayout() {
                     color={color}
                     size={focused ? 30 : 25}
                   />
-
-                  {focused ? (
-                    <IndicadorActivo />
-                  ) : null}
                 </View>
               ),
             }}
@@ -76,6 +78,12 @@ export default function TabsLayout() {
             name="busqueda"
             options={{
               title: 'Búsqueda',
+              tabBarLabel: ({ focused, color }) => (
+                <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: 28 }}>
+                  <Text style={{ color, fontSize: 12, fontWeight: '600' }}>Búsqueda</Text>
+                  {focused ? <IndicadorActivo /> : null}
+                </View>
+              ),
               tabBarIcon: ({ color, focused }) => (
                 <View style={styles.iconContainer}>
                   <Ionicons
@@ -87,10 +95,6 @@ export default function TabsLayout() {
                     color={color}
                     size={focused ? 30 : 25}
                   />
-
-                  {focused ? (
-                    <IndicadorActivo />
-                  ) : null}
                 </View>
               ),
             }}
@@ -100,6 +104,12 @@ export default function TabsLayout() {
             name="biblioteca"
             options={{
               title: 'Biblioteca',
+              tabBarLabel: ({ focused, color }) => (
+                <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: 28 }}>
+                  <Text style={{ color, fontSize: 12, fontWeight: '600' }}>Biblioteca</Text>
+                  {focused ? <IndicadorActivo /> : null}
+                </View>
+              ),
               tabBarIcon: ({ color, focused }) => (
                 <View style={styles.iconContainer}>
                   <Ionicons
@@ -111,10 +121,6 @@ export default function TabsLayout() {
                     color={color}
                     size={focused ? 30 : 25}
                   />
-
-                  {focused ? (
-                    <IndicadorActivo />
-                  ) : null}
                 </View>
               ),
             }}
@@ -124,6 +130,12 @@ export default function TabsLayout() {
             name="perfil"
             options={{
               title: 'Perfil',
+              tabBarLabel: ({ focused, color }) => (
+                <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: 28 }}>
+                  <Text style={{ color, fontSize: 12, fontWeight: '600' }}>Perfil</Text>
+                  {focused ? <IndicadorActivo /> : null}
+                </View>
+              ),
               tabBarIcon: ({ color, focused }) => (
                 <View style={styles.iconContainer}>
                   <Ionicons
@@ -135,10 +147,6 @@ export default function TabsLayout() {
                     color={color}
                     size={focused ? 30 : 25}
                   />
-
-                  {focused ? (
-                    <IndicadorActivo />
-                  ) : null}
                 </View>
               ),
             }}
@@ -168,8 +176,7 @@ const styles = StyleSheet.create({
   },
 
   activeIndicator: {
-    position: 'absolute',
-    bottom: 0,
+    marginTop: 5,
     width: 52,
     height: 3,
     borderRadius: 3,

@@ -186,6 +186,7 @@ export default function InicioScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
+            <Text style={styles.homeHeaderTitle}>Inicio</Text>
             <Image
               source={require('../../../assets/images/undermusic-logo.png')}
               style={styles.logo}
@@ -315,6 +316,18 @@ const styles = StyleSheet.create({
   logo: {
     width: 380,
     height: 175,
+  },
+
+  homeHeaderTitle: {
+    position: 'absolute',
+    top: 22,
+    left: 0,
+    height: 50,
+    textAlignVertical: 'center',
+    color: '#FFFFFF',
+    fontSize: 29,
+    fontWeight: '800',
+    zIndex: 1,
   },
 
   notificationButton: {

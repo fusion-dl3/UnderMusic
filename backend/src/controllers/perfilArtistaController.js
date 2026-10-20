@@ -371,8 +371,130 @@ async function obtenerPerfilArtistaPublico(req, res) {
   }
 }
 
+async function buscarArtistas(req, res) {
+  try {
+    const {
+      nombre = '',
+      pais = '',
+      region = '',
+      comuna = '',
+      genero = ''
+    } = req.query;
+
+    const filtros = { nombre, pais, region, comuna, genero };
+
+    if (
+      Object.values(filtros).some(
+        (valor) => typeof valor !== 'string'
+      )
+    ) {
+      return res.status(400).json({
+        message: 'Los filtros de búsqueda no son válidos'
+      });
+    }
+
+    const usuarios = getUsuariosCollection();
+    const perfilesArtista = getPerfilesArtistaCollection();
+
+    const filtroUsuarios = {
+      rol: 'artista'
+    };
+
+    if (pais && pais !== 'Todos') {
+      filtroUsuarios['ubicacion.pais'] = pais;
+    }
+
+    if (region && region !== 'Todas') {
+      filtroUsuarios['ubicacion.region'] = region;
+    }
+
+    if (comuna && comuna !== 'Todas') {
+      filtroUsuarios['ubicacion.comuna'] = comuna;
+    }
+
+    const usuariosEncontrados = await usuarios
+      .find(filtroUsuarios)
+      .project({
+        nombreUsuario: 1,
+        fotoPerfil: 1,
+        ubicacion: 1
+      })
+      .toArray();
+
+    const usuariosPorId = new Map(
+      usuariosEncontrados.map((usuario) => [
+        usuario._id.toString(),
+        usuario
+      ])
+    );
+
+    const filtroPerfiles = {
+      perfilCompleto: true,
+      usuarioId: {
+        $in: usuariosEncontrados.map((usuario) => usuario._id)
+      }
+    };
+
+    if (genero && genero !== 'Todos') {
+      filtroPerfiles.$or = [
+        { generoPrincipal: genero },
+        { generosAdicionales: genero }
+      ];
+    }
+
+    if (nombre.trim()) {
+      const nombreEscapado = nombre
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      filtroPerfiles.nombreArtistico = {
+        $regex: nombreEscapado,
+        $options: 'i'
+      };
+    }
+
+    const perfilesEncontrados = await perfilesArtista
+      .find(filtroPerfiles)
+      .sort({ fechaCreacion: -1 })
+      .limit(100)
+      .toArray();
+
+    const artistas = perfilesEncontrados.map((perfil) => {
+      const usuario = usuariosPorId.get(
+        perfil.usuarioId.toString()
+      );
+
+      return {
+        usuarioId: perfil.usuarioId,
+        nombreUsuario: usuario.nombreUsuario,
+        nombreArtistico: perfil.nombreArtistico,
+        fotoPerfil: usuario.fotoPerfil || null,
+        ubicacion: {
+          pais: usuario.ubicacion?.pais || '',
+          region: usuario.ubicacion?.region || '',
+          comuna: usuario.ubicacion?.comuna || ''
+        },
+        generoPrincipal: perfil.generoPrincipal,
+        generosAdicionales: perfil.generosAdicionales || []
+      };
+    });
+
+    return res.status(200).json({
+      artistas,
+      total: artistas.length
+    });
+  } catch (error) {
+    console.error('Error al buscar artistas:', error);
+
+    return res.status(500).json({
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 module.exports = {
   obtenerMiPerfilArtista,
   actualizarMiPerfilArtista,
-  obtenerPerfilArtistaPublico
+  obtenerPerfilArtistaPublico,
+  buscarArtistas
 };

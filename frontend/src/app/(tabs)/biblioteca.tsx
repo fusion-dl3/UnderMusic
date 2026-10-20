@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -13,6 +14,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 const API_URL = 'http://192.168.1.5:3000';
@@ -54,6 +56,7 @@ const filtros: { id: Exclude<FiltroBiblioteca, 'todos'>; titulo: string }[] = [
 ];
 
 export default function BibliotecaScreen() {
+  const { width: anchoPantalla } = useWindowDimensions();
   const [filtroActivo, setFiltroActivo] = useState<FiltroBiblioteca>('todos');
   const [artistas, setArtistas] = useState<ArtistaSeguido[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -532,14 +535,17 @@ export default function BibliotecaScreen() {
       style={styles.contenedor}
       resizeMode="cover"
     >
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.contenido}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.encabezado}>
-          <Text style={styles.titulo}>Tu biblioteca</Text>
-          <Ionicons name="library-outline" size={29} color="#E15CFF" />
+        <View style={[styles.encabezado, { width: anchoPantalla - 56, alignSelf: 'center' }]}>
+          <Text style={styles.titulo}>Mi biblioteca</Text>
+          <View style={styles.iconoEncabezado}>
+            <Ionicons name="library-outline" size={34} color="#E15CFF" />
+          </View>
         </View>
 
         <View style={styles.filtrosFila}>
@@ -609,6 +615,7 @@ export default function BibliotecaScreen() {
           </View>
         )}
       </ScrollView>
+      </SafeAreaView>
     </ImageBackground>
   );
 }
@@ -616,8 +623,10 @@ export default function BibliotecaScreen() {
 const styles = StyleSheet.create({
   contenedor: { flex: 1, backgroundColor: '#020106' },
   scroll: { flex: 1 },
-  contenido: { width: '100%', maxWidth: 700, alignSelf: 'center', paddingHorizontal: 22, paddingTop: 30, paddingBottom: 55 },
-  encabezado: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 23 },
+  safeArea: { flex: 1 },
+  contenido: { width: '100%', maxWidth: 700, alignSelf: 'center', paddingHorizontal: 28, paddingTop: 30, paddingBottom: 55 },
+  encabezado: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 50, marginBottom: 23 },
+  iconoEncabezado: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
   titulo: { color: '#FFFFFF', fontSize: 29, fontWeight: '800' },
   filtrosFila: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 30 },
   filtro: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 25, backgroundColor: '#21112F', borderWidth: 1, borderColor: '#573070' },
