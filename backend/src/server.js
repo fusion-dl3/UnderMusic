@@ -13,6 +13,7 @@ const { crearIndicesCanciones } = require('./models/cancionModel');
 const { crearIndicesSeguimientos } = require('./models/seguimientoModel');
 const { crearIndicesMeGustas } = require('./models/meGustaModel');
 const { crearIndicesGuardadas } = require('./models/guardadaModel');
+const { crearIndicesReproducciones } = require('./models/reproduccionModel');
 
 const usuarioRoutes = require('./routes/usuarioRoutes');
 const perfilArtistaRoutes = require('./routes/perfilArtistaRoutes');
@@ -20,6 +21,7 @@ const cancionRoutes = require('./routes/cancionRoutes');
 const seguimientoRoutes = require('./routes/seguimientoRoutes');
 const meGustaRoutes = require('./routes/meGustaRoutes');
 const guardadaRoutes = require('./routes/guardadaRoutes');
+const reproduccionRoutes = require('./routes/reproduccionRoutes');
 
 
 const app = express();
@@ -64,6 +66,7 @@ app.use('/api/canciones', cancionRoutes);
 app.use('/api/seguimientos', seguimientoRoutes);
 app.use('/api/me-gustas', meGustaRoutes);
 app.use('/api/guardadas', guardadaRoutes);
+app.use('/api/reproducciones', reproduccionRoutes);
 
 async function startServer() {
   try {
@@ -75,6 +78,7 @@ async function startServer() {
     await crearIndicesSeguimientos();
     await crearIndicesMeGustas();
     await crearIndicesGuardadas();
+    await crearIndicesReproducciones();
 
     app.listen(PORT, () => {
       console.log(

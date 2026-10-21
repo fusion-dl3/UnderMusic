@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -11,8 +12,10 @@ import {
   useAudioPlayer,
   useAudioPlayerStatus,
 } from 'expo-audio';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = 'http://192.168.1.5:3000';
+const SEGUNDOS_MINIMOS_ESCUCHA = 30;
 
 export type CancionReproductor = {
   id: string;
@@ -73,19 +76,85 @@ export function PlayerProvider({
 
   const status = useAudioPlayerStatus(player);
 
+  // Identifica la reproducción que estamos contabilizando.
+const registrarEscuchaEnBackend = async (
+  cancionId: string
+) => {
+  try {
+    const token = await SecureStore.getItemAsync('token');
+
+    if (!token) {
+      console.log(
+        'REPRODUCCIÓN NO REGISTRADA: usuario sin sesión'
+      );
+      return;
+    }
+
+    const respuesta = await fetch(
+      `${API_URL}/api/reproducciones`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cancionId,
+        }),
+      }
+    );
+
+    const datos = await respuesta.json();
+
+    if (!respuesta.ok) {
+      console.error(
+        'ERROR AL REGISTRAR REPRODUCCIÓN:',
+        datos.message || respuesta.status
+      );
+      return;
+    }
+
+    console.log(
+      'REPRODUCCIÓN GUARDADA EN MONGODB:',
+      cancionId
+    );
+  } catch (error) {
+    console.error(
+      'ERROR DE CONEXIÓN AL REGISTRAR REPRODUCCIÓN:',
+      error
+    );
+  }
+};
+const escuchaRef = useRef({
+  cancionId: '',
+  segundosAcumulados: 0,
+  ultimaPosicion: null as number | null,
+  ultimoInstante: null as number | null,
+  registrada: false,
+  esperandoSalto: false,
+});
+
   const cargarYReproducir = (
-    cancion: CancionReproductor
-  ) => {
-    const urlAudio =
-      `${API_URL}/api/canciones/audio/${cancion.audioId}`;
-
-    player.replace(urlAudio);
-
-    setCancionActual(cancion);
-
-    player.play();
+  cancion: CancionReproductor
+) => {
+  escuchaRef.current = {
+    cancionId: cancion.id,
+    segundosAcumulados: 0,
+    ultimaPosicion: null,
+    ultimoInstante: null,
+    registrada: false,
+    esperandoSalto: false,
   };
 
+  const urlAudio =
+    `${API_URL}/api/canciones/audio/${cancion.audioId}`;
+
+  player.replace(urlAudio);
+
+  setCancionActual(cancion);
+
+  player.play();
+};
   const reproducirCancion = (
     cancion: CancionReproductor,
     nuevaCola?: CancionReproductor[]
@@ -142,7 +211,11 @@ export function PlayerProvider({
           )
         : Math.max(segundos, 0);
 
-    player.seekTo(posicionSegura);
+    escuchaRef.current.esperandoSalto = true;
+escuchaRef.current.ultimaPosicion = null;
+escuchaRef.current.ultimoInstante = null;
+
+player.seekTo(posicionSegura);
   };
 
   const reproducirAnterior = () => {
@@ -202,6 +275,95 @@ export function PlayerProvider({
     setCancionActual(null);
     setCola([]);
   };
+
+  useEffect(() => {
+  const escucha = escuchaRef.current;
+
+  if (
+    !cancionActual ||
+    escucha.cancionId !== cancionActual.id
+  ) {
+    return;
+  }
+
+  const posicionActual = status.currentTime;
+  const instanteActual = Date.now();
+
+  if (
+    !status.playing ||
+    !status.isLoaded ||
+    !Number.isFinite(posicionActual)
+  ) {
+    escucha.ultimaPosicion = null;
+    escucha.ultimoInstante = null;
+    return;
+  }
+
+  if (escucha.esperandoSalto) {
+    escucha.esperandoSalto = false;
+    escucha.ultimaPosicion = posicionActual;
+    escucha.ultimoInstante = instanteActual;
+    return;
+  }
+
+  if (
+    escucha.ultimaPosicion === null ||
+    escucha.ultimoInstante === null
+  ) {
+    escucha.ultimaPosicion = posicionActual;
+    escucha.ultimoInstante = instanteActual;
+    return;
+  }
+
+  const avanceAudio =
+    posicionActual - escucha.ultimaPosicion;
+
+  const tiempoReal =
+    (instanteActual - escucha.ultimoInstante) / 1000;
+
+  escucha.ultimaPosicion = posicionActual;
+  escucha.ultimoInstante = instanteActual;
+
+  // Descartar retrocesos, saltos y pausas largas
+  // entre actualizaciones.
+  if (
+    avanceAudio <= 0 ||
+    tiempoReal <= 0 ||
+    tiempoReal > 2 ||
+    avanceAudio > tiempoReal + 0.5
+  ) {
+    return;
+  }
+
+  // No contabilizar más tiempo del que realmente
+  // transcurrió entre actualizaciones.
+  escucha.segundosAcumulados += Math.min(
+    avanceAudio,
+    tiempoReal
+  );
+
+  if (
+  escucha.segundosAcumulados >=
+    SEGUNDOS_MINIMOS_ESCUCHA &&
+  !escucha.registrada
+) {
+  escucha.registrada = true;
+
+  console.log(
+    'ESCUCHA VÁLIDA:',
+    cancionActual.titulo,
+    escucha.segundosAcumulados.toFixed(1),
+    'segundos'
+  );
+
+  void registrarEscuchaEnBackend(cancionActual.id);
+}
+}, [
+  cancionActual,
+  status.currentTime,
+  status.playing,
+  status.isLoaded,
+]);
 
   useEffect(() => {
     if (
