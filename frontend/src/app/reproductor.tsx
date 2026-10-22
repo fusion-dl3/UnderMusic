@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -235,6 +236,88 @@ function TextoEscuchando({
         </Text>
       </Text>
     </Animated.View>
+  );
+}
+
+// Destello blanco suave que recorre el borde de la portada principal.
+// Conserva el tamaño y el fondo violeta originales de la portada.
+function BordePortadaAnimado({
+  children,
+  reproduciendo,
+}: {
+  children: ReactNode;
+  reproduciendo: boolean;
+}) {
+  const giro = useRef(new Animated.Value(0)).current;
+  const avance = useRef(0);
+
+  useEffect(() => {
+    if (!reproduciendo) {
+      // Conserva el ángulo exacto al pausar; no vuelve al principio.
+      giro.stopAnimation((valor) => {
+        avance.current = valor;
+      });
+      return;
+    }
+
+    let activo = true;
+    let animacion: Animated.CompositeAnimation | null = null;
+
+    const continuar = (desde: number) => {
+      if (!activo) return;
+      // Completa la vuelta desde el punto donde quedó en pausa.
+      animacion = Animated.timing(giro, {
+        toValue: 1,
+        duration: Math.max(1, Math.round((1 - desde) * 8500)),
+        easing: Easing.linear,
+        useNativeDriver: true,
+      });
+      animacion.start(({ finished }) => {
+        if (!activo || !finished) return;
+        // 360° y 0° son visualmente idénticos: reinicio imperceptible.
+        giro.setValue(0);
+        avance.current = 0;
+        continuar(0);
+      });
+    };
+
+    giro.stopAnimation((valor) => {
+      if (!activo) return;
+      avance.current = valor;
+      continuar(valor);
+    });
+
+    return () => {
+      activo = false;
+      animacion?.stop();
+    };
+  }, [giro, reproduciendo]);
+
+  const rotacion = giro.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <View style={styles.coverGlow}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.coverBorderLight, { transform: [{ rotate: rotacion }] }]}
+      >
+        <LinearGradient
+          colors={[
+            'rgba(255,255,255,0)',
+            'rgba(255,255,255,0.02)',
+            'rgba(255,255,255,0.78)',
+            'rgba(255,255,255,0.02)',
+            'rgba(255,255,255,0)',
+          ]}
+          locations={[0, 0.455, 0.5, 0.545, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+      {children}
+    </View>
   );
 }
 
@@ -573,7 +656,7 @@ const progresoVisible =
           </View>
 
           <View style={styles.content}>
-            <View style={styles.coverGlow}>
+            <BordePortadaAnimado reproduciendo={reproduciendo}>
               <View style={styles.coverContainer}>
                 {uriImagen ? (
                   <Image
@@ -591,7 +674,7 @@ const progresoVisible =
                   </View>
                 )}
               </View>
-            </View>
+            </BordePortadaAnimado>
 
             <View style={styles.songInfoRow}>
               <View style={styles.songInfo}>
@@ -895,6 +978,15 @@ degradadoBarra: {
     padding: 3,
     borderRadius: 32,
     backgroundColor: 'rgba(152, 61, 232, 0.72)',
+    overflow: 'hidden',
+  },
+
+  coverBorderLight: {
+    position: 'absolute',
+    width: '220%',
+    height: '220%',
+    left: '-60%',
+    top: '-60%',
   },
 
   coverContainer: {

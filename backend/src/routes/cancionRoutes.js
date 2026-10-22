@@ -17,6 +17,10 @@ const {
 } = require('../middlewares/authMiddleware');
 
 const {
+  obtenerLanzamientosRecientes
+} = require('../controllers/lanzamientosController');
+
+const {
   subirArchivosCancion
 } = require('../middlewares/uploadCancionMiddleware');
 
@@ -65,6 +69,13 @@ router.get(
 router.get(
   '/generos/artistas',
   obtenerArtistasPorGenero
+);
+
+// Lanzamientos recientes personalizados para el usuario.
+router.get(
+  '/lanzamientos-recientes',
+  verificarToken,
+  obtenerLanzamientosRecientes
 );
 
 router.get(

@@ -1,18 +1,32 @@
+
 const express = require('express');
 
 const {
   obtenerMiPerfilArtista,
   actualizarMiPerfilArtista,
   obtenerPerfilArtistaPublico,
-  buscarArtistas
+  buscarArtistas,
 } = require('../controllers/perfilArtistaController');
 
 const {
-  verificarToken
+  obtenerArtistasDestacados,
+} = require('../controllers/destacadosController');
+
+const {
+  obtenerArtistasRecomendados,
+} = require('../controllers/recomendadosController');
+
+const {
+  obtenerArtistasCercanos,
+} = require('../controllers/cercanosController');
+
+const {
+  verificarToken,
 } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
+// Perfil del artista autenticado.
 router.get(
   '/me',
   verificarToken,
@@ -25,14 +39,32 @@ router.patch(
   actualizarMiPerfilArtista
 );
 
+// Artistas destacados personalizados.
 router.get(
-  '/buscar',
-  buscarArtistas
+  '/destacados',
+  verificarToken,
+  obtenerArtistasDestacados
 );
 
+// Artistas recomendados según crecimiento reciente.
 router.get(
-  '/:usuarioId',
-  obtenerPerfilArtistaPublico
+  '/recomendados',
+  verificarToken,
+  obtenerArtistasRecomendados
 );
+
+// Artistas cercanos según la ubicación del usuario.
+router.get(
+  '/cercanos',
+  verificarToken,
+  obtenerArtistasCercanos
+);
+
+// Búsqueda de artistas.
+router.get('/buscar', buscarArtistas);
+
+// Perfil público de un artista.
+// Esta ruta debe permanecer después de las rutas específicas.
+router.get('/:usuarioId', obtenerPerfilArtistaPublico);
 
 module.exports = router;
