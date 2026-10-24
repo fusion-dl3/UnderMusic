@@ -135,17 +135,22 @@ const escuchaRef = useRef({
   esperandoSalto: false,
 });
 
+  // Inicia un nuevo ciclo de escucha, sin modificar el audio ni la cola.
+  const reiniciarCicloEscucha = (cancionId: string) => {
+    escuchaRef.current = {
+      cancionId,
+      segundosAcumulados: 0,
+      ultimaPosicion: null,
+      ultimoInstante: null,
+      registrada: false,
+      esperandoSalto: true,
+    };
+  };
+
   const cargarYReproducir = (
   cancion: CancionReproductor
 ) => {
-  escuchaRef.current = {
-    cancionId: cancion.id,
-    segundosAcumulados: 0,
-    ultimaPosicion: null,
-    ultimoInstante: null,
-    registrada: false,
-    esperandoSalto: false,
-  };
+  reiniciarCicloEscucha(cancion.id);
 
   const urlAudio =
     `${API_URL}/api/canciones/audio/${cancion.audioId}`;
@@ -231,6 +236,7 @@ player.seekTo(posicionSegura);
         : 0;
 
     if (posicionActual >= 5) {
+      reiniciarCicloEscucha(cancionActual.id);
       player.seekTo(0);
       return;
     }
@@ -247,6 +253,7 @@ player.seekTo(posicionSegura);
       return;
     }
 
+    reiniciarCicloEscucha(cancionActual.id);
     player.seekTo(0);
   };
 
@@ -392,6 +399,7 @@ player.seekTo(posicionSegura);
     }
 
     player.pause();
+    reiniciarCicloEscucha(cancionActual.id);
     player.seekTo(0);
   }, [
     cancionActual,

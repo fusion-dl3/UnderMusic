@@ -602,3 +602,17 @@
     width: min(245px, calc(100vw - 24px));
   }
 }
+/* Destello perimetral: 8,5 s por vuelta, pausa sin reiniciar. */
+.um-player-cover-glow { position: relative; isolation: isolate; overflow: hidden; }
+.um-player-cover-border-light {
+  position: absolute; width: 220%; height: 220%; left: -60%; top: -60%;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.02) 45.5%, rgba(255,255,255,0.78) 50%, rgba(255,255,255,0.02) 54.5%, rgba(255,255,255,0) 100%);
+  transform-origin: center;
+  animation: um-cover-border-rotation 8.5s linear infinite;
+  animation-play-state: paused;
+}
+.um-player-cover-glow.is-playing .um-player-cover-border-light { animation-play-state: running; }
+.um-player-cover-frame { position: relative; z-index: 1; }
+@keyframes um-cover-border-rotation { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .um-player-cover-border-light { animation: none; } }

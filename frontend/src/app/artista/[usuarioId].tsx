@@ -56,6 +56,12 @@ type ArtistaPublico = {
   twitter: string;
 };
 
+type EstadisticasArtista = {
+  oyentesUnicos: number;
+  reproduccionesTotales: number;
+  cantidadSeguidores: number;
+};
+
 type Cancion = {
   id: string;
   titulo: string;
@@ -123,6 +129,8 @@ export default function PerfilArtistaPublicoScreen() {
   const [error, setError] =
     useState('');
 
+  const [estadisticas, setEstadisticas] = useState<EstadisticasArtista | null>(null);
+  const [cargandoEstadisticas, setCargandoEstadisticas] = useState(false);
   const [siguiendo, setSiguiendo] = useState(false);
   const [cantidadSeguidores, setCantidadSeguidores] = useState<number | null>(null);
   const [cargandoSeguimiento, setCargandoSeguimiento] = useState(true);
@@ -150,7 +158,7 @@ export default function PerfilArtistaPublicoScreen() {
     }
 
     cargarPerfilPublico();
-    cargarEstadoSeguimiento();
+    if (!esVistaPrevia) cargarEstadoSeguimiento();
   }, [usuarioId]);
 
   const cargarMisMeGustas = async () => {
@@ -254,6 +262,30 @@ export default function PerfilArtistaPublicoScreen() {
       void cargarMisMeGustas();
       void cargarMisGuardadas();
     }, [usuarioId, esVistaPrevia])
+  );
+
+  const cargarEstadisticas = async () => {
+    if (!usuarioId) return;
+    try {
+      setCargandoEstadisticas(true);
+      const respuesta = await fetch(
+        `${API_URL}/api/perfiles-artista/${usuarioId}/estadisticas`
+      );
+      if (!respuesta.ok) throw new Error('No se pudieron cargar las estadísticas.');
+      const datos: EstadisticasArtista = await respuesta.json();
+      setEstadisticas(datos);
+    } catch (error) {
+      console.error('Error al cargar estadísticas del artista:', error);
+      setEstadisticas(null);
+    } finally {
+      setCargandoEstadisticas(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (usuarioId) void cargarEstadisticas();
+    }, [usuarioId])
   );
 
   const cargarEstadoSeguimiento = async () => {
@@ -674,14 +706,35 @@ router.push('/reproductor');
                   {artista.ubicacion.comuna}, {artista.ubicacion.region}
                 </Text>
               </View>
-              <View style={styles.followersRow}>
-                <Ionicons name="people-outline" size={21} color="#E05BFF" />
-                <Text style={styles.followCount}>
-                  {cantidadSeguidores === null ? '—' : cantidadSeguidores}{' '}
-                  {cantidadSeguidores === 1 ? 'seguidor' : 'seguidores'}
+
+            </View>
+
+            <View style={styles.metricsRow}>
+              <View style={styles.metricCard}>
+                <Ionicons name="headset-outline" size={23} color="#54E6FF" />
+                <Text style={styles.metricValue}>
+                  {estadisticas ? estadisticas.oyentesUnicos.toLocaleString('es-CL') : '—'}
                 </Text>
+                <Text style={styles.metricLabel}>Oyentes únicos</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Ionicons name="play-circle-outline" size={23} color="#FF68B7" />
+                <Text style={styles.metricValue}>
+                  {estadisticas ? estadisticas.reproduccionesTotales.toLocaleString('es-CL') : '—'}
+                </Text>
+                <Text style={styles.metricLabel}>Reproducciones</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Ionicons name="people-outline" size={23} color="#E05BFF" />
+                <Text style={styles.metricValue}>
+                  {(cantidadSeguidores ?? estadisticas?.cantidadSeguidores)?.toLocaleString('es-CL') ?? '—'}
+                </Text>
+                <Text style={styles.metricLabel}>Seguidores</Text>
               </View>
             </View>
+            {cargandoEstadisticas && !estadisticas ? (
+              <Text style={styles.metricsHint}>Cargando estadísticas...</Text>
+            ) : null}
 
             {esVistaPrevia ? (
               <View style={styles.previewNotice}>
@@ -1000,6 +1053,16 @@ router.push('/reproductor');
                          </Pressable>
 
                         <Pressable
+                           style={styles.songQueueButton}
+                           disabled
+                           accessibilityRole="button"
+                           accessibilityState={{ disabled: true }}
+                           accessibilityLabel={`Añadir ${cancion.titulo} a la cola de reproducción (próximamente)`}
+                         >
+                           <Ionicons name="list-outline" size={22} color="#B7A6C7" />
+                         </Pressable>
+
+                         <Pressable
                           style={styles.songSaveButton}
                           disabled={esVistaPrevia || procesandoGuardada !== null}
                           onPress={() => alternarGuardada(cancion.id)}
@@ -1568,6 +1631,42 @@ header: {
     fontSize: 15,
     fontWeight: '700',
   },
+  metricsRow: {
+    width: '100%',
+    maxWidth: 540,
+    flexDirection: 'row',
+    gap: 9,
+    marginTop: 23,
+  },
+  metricCard: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    paddingVertical: 15,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: 'rgba(172, 94, 240, 0.50)',
+    backgroundColor: 'rgba(32, 15, 56, 0.80)',
+    gap: 6,
+  },
+  metricValue: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  metricLabel: {
+    color: '#CFC2DC',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  metricsHint: {
+    color: '#BEB1CD',
+    fontSize: 12,
+    marginTop: 8,
+  },
   profileActionsRow: {
     width: '100%',
     maxWidth: 440,
@@ -1762,6 +1861,7 @@ header: {
     borderColor: 'rgba(255, 104, 183, 0.45)',
   },
 
+  songQueueButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 7, backgroundColor: 'rgba(91, 80, 112, 0.13)', borderWidth: 1, borderColor: 'rgba(170, 151, 192, 0.32)', opacity: 0.55 },
   songSaveButton: {
     width: 42,
     height: 42,

@@ -21,6 +21,10 @@ const {
 } = require('../controllers/cercanosController');
 
 const {
+  obtenerEstadisticasArtista,
+} = require('../controllers/estadisticasArtistaController');
+
+const {
   verificarToken,
 } = require('../middlewares/authMiddleware');
 
@@ -62,6 +66,12 @@ router.get(
 
 // Búsqueda de artistas.
 router.get('/buscar', buscarArtistas);
+
+// Estadísticas públicas de un artista.
+router.get(
+  '/:usuarioId/estadisticas',
+  obtenerEstadisticasArtista
+);
 
 // Perfil público de un artista.
 // Esta ruta debe permanecer después de las rutas específicas.

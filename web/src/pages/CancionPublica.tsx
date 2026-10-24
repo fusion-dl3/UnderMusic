@@ -333,7 +333,8 @@ async function reiniciarCancion() {
 
       {!cargando && cancion && (
         <section className="um-player-content">
-          <div className="um-player-cover-glow">
+          <div className={`um-player-cover-glow${reproduciendo ? ' is-playing' : ''}`}>
+            <div className="um-player-cover-border-light" aria-hidden="true" />
             <div className="um-player-cover-frame">
               {cancion.portadaId ? (
   <img

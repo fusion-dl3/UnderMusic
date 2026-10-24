@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, Bookmark, Check, Copy, Disc3, ExternalLink, Heart,
-  Mail, MapPin, MessageCircleMore, Music2, Play, Share2, UserRound,
+  ArrowLeft, Bookmark, Check, Copy, Disc3, ExternalLink, Heart, Headphones, CirclePlay,
+  Mail, MapPin, MessageCircleMore, Music2, Play, ListMusic, Share2, UserRound,
   UserRoundPlus, UsersRound, X,
 } from 'lucide-react'
 import { apiUrl } from '../config/api'
@@ -34,7 +34,13 @@ type Cancion = {
   portadaId: string | null
 }
 
-type AccionRestringida = 'seguir' | 'guardar' | 'me-gusta' | null
+type EstadisticasArtista = {
+  oyentesUnicos: number
+  reproduccionesTotales: number
+  cantidadSeguidores: number
+}
+
+type AccionRestringida = 'seguir' | 'guardar' | 'me-gusta' | 'cola' | null
 
 type Contacto = {
   nombre: string
@@ -62,7 +68,8 @@ function urlRedSocial(valor: string | undefined, dominios: string[]): string | n
 export default function PerfilArtistaPublico() {
   const { usuarioId } = useParams<{ usuarioId: string }>()
   const [artista, setArtista] = useState<Artista | null>(null)
-  const [cantidadSeguidores, setCantidadSeguidores] = useState<number | null>(null)
+  const [estadisticas, setEstadisticas] = useState<EstadisticasArtista | null>(null)
+  const [cargandoEstadisticas, setCargandoEstadisticas] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [canciones, setCanciones] = useState<Cancion[]>([])
@@ -106,41 +113,30 @@ export default function PerfilArtistaPublico() {
     return () => controlador.abort()
   }, [usuarioId])
 
-    useEffect(() => {
+  useEffect(() => {
     if (!usuarioId) {
-      setCantidadSeguidores(null)
+      setEstadisticas(null)
       return
     }
-
     const controlador = new AbortController()
-
-    async function cargarSeguidores() {
-      setCantidadSeguidores(null)
-
+    async function cargarEstadisticas() {
+      setEstadisticas(null)
+      setCargandoEstadisticas(true)
       try {
         const respuesta = await fetch(
-          apiUrl(`/api/seguimientos/artistas/${usuarioId}/seguidores`),
+          apiUrl(`/api/perfiles-artista/${usuarioId}/estadisticas`),
           { signal: controlador.signal }
         )
-
-        if (!respuesta.ok) {
-          throw new Error('No se pudo obtener la cantidad de seguidores')
-        }
-
-        const datos = await respuesta.json()
-
-        if (!controlador.signal.aborted) {
-          setCantidadSeguidores(datos.cantidadSeguidores)
-        }
+        if (!respuesta.ok) throw new Error('No se pudieron cargar las estadísticas.')
+        const datos: EstadisticasArtista = await respuesta.json()
+        if (!controlador.signal.aborted) setEstadisticas(datos)
       } catch (error) {
-        if (!controlador.signal.aborted) {
-          console.error('Error al cargar seguidores:', error)
-        }
+        if (!controlador.signal.aborted) console.error('Error al cargar estadísticas:', error)
+      } finally {
+        if (!controlador.signal.aborted) setCargandoEstadisticas(false)
       }
     }
-
-    void cargarSeguidores()
-
+    void cargarEstadisticas()
     return () => controlador.abort()
   }, [usuarioId])
 
@@ -283,7 +279,9 @@ function renderizarMenuCompartir(id: string) {
     ? `Para seguir a ${nombreArtista}, necesitas utilizar la aplicación UnderMusic para Android.`
     : accionRestringida === 'guardar'
       ? 'Para guardar canciones en tu biblioteca, necesitas utilizar la aplicación UnderMusic para Android.'
-      : 'Para dar Me gusta a las canciones, necesitas utilizar la aplicación UnderMusic para Android.'
+      : accionRestringida === 'cola'
+        ? 'Para añadir canciones a la cola de reproducción, necesitas utilizar la aplicación UnderMusic para Android cuando esta función esté disponible.'
+        : 'Para dar Me gusta a las canciones, necesitas utilizar la aplicación UnderMusic para Android.'
 
   return (
     <main className="perfil-publico">
@@ -325,20 +323,31 @@ function renderizarMenuCompartir(id: string) {
               <span className="perfil-etiqueta">ARTISTA</span>
               {artista.ubicacion?.pais && <span>{artista.ubicacion.pais}</span>}
             </div>
-            <div className="perfil-estadisticas">
-  {ubicacion && (
-    <span className="perfil-ubicacion">
-      <MapPin size={20} /> {ubicacion}
-    </span>
-  )}
-
-  {cantidadSeguidores !== null && (
-    <span className="perfil-seguidores">
-      <UsersRound size={20} />
-      {cantidadSeguidores} {cantidadSeguidores === 1 ? 'seguidor' : 'seguidores'}
-    </span>
-  )}
-</div>
+            {ubicacion && (
+              <div className="perfil-estadisticas">
+                <span className="perfil-ubicacion"><MapPin size={20} /> {ubicacion}</span>
+              </div>
+            )}
+            <div className="perfil-metricas" aria-label="Estadísticas musicales del artista">
+              <div className="perfil-metrica">
+                <Headphones size={24} className="perfil-metrica-cian" aria-hidden="true" />
+                <strong>{estadisticas?.oyentesUnicos.toLocaleString('es-CL') ?? '—'}</strong>
+                <span>Oyentes únicos</span>
+              </div>
+              <div className="perfil-metrica">
+                <CirclePlay size={24} className="perfil-metrica-rosa" aria-hidden="true" />
+                <strong>{estadisticas?.reproduccionesTotales.toLocaleString('es-CL') ?? '—'}</strong>
+                <span>Reproducciones</span>
+              </div>
+              <div className="perfil-metrica">
+                <UsersRound size={24} className="perfil-metrica-violeta" aria-hidden="true" />
+                <strong>{estadisticas?.cantidadSeguidores.toLocaleString('es-CL') ?? '—'}</strong>
+                <span>Seguidores</span>
+              </div>
+            </div>
+            {cargandoEstadisticas && !estadisticas && (
+              <p className="perfil-metricas-estado" role="status">Cargando estadísticas...</p>
+            )}
             <div className="perfil-acciones">
               <button type="button" className="perfil-seguir" onClick={() => setAccionRestringida('seguir')}>
                 <UserRoundPlus size={19} /> Seguir
@@ -436,6 +445,7 @@ function renderizarMenuCompartir(id: string) {
 
 {renderizarMenuCompartir(`cancion-${cancion.id}`)}
 
+                        <button type="button" className="perfil-cancion-accion perfil-cancion-cola" aria-label={`Añadir ${cancion.titulo} a la cola de reproducción`} onClick={() => setAccionRestringida('cola')}><ListMusic size={21} /></button>
                         <button type="button" className="perfil-cancion-accion perfil-cancion-guardar" aria-label={`Guardar ${cancion.titulo}`} onClick={() => setAccionRestringida('guardar')}><Bookmark size={21} /></button>
                         <button type="button" className="perfil-cancion-accion perfil-cancion-megusta" aria-label={`Dar Me gusta a ${cancion.titulo}`} onClick={() => setAccionRestringida('me-gusta')}><Heart size={22} /></button>
                         {cancion.audioId ? (

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   CancionReproductor,
   usePlayer,
@@ -61,6 +61,12 @@ type Cancion = {
   fechaActualizacion: string;
 };
 
+type EstadisticasArtista = {
+  oyentesUnicos: number;
+  reproduccionesTotales: number;
+  cantidadSeguidores: number;
+};
+
 export default function PerfilScreen() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const {
@@ -74,7 +80,13 @@ export default function PerfilScreen() {
     useState<PerfilArtista | null>(null);
   const [canciones, setCanciones] =
     useState<Cancion[]>([]);
-  const [cantidadSeguidores, setCantidadSeguidores] = useState<number | null>(null);
+  const [estadisticas, setEstadisticas] = useState<EstadisticasArtista | null>(null);
+  const [meGustas, setMeGustas] = useState<string[]>([]);
+  const [guardadas, setGuardadas] = useState<string[]>([]);
+  const [procesandoMeGusta, setProcesandoMeGusta] = useState<string | null>(null);
+  const [procesandoGuardada, setProcesandoGuardada] = useState<string | null>(null);
+  const bloqueoMeGusta = useRef(false);
+  const bloqueoGuardada = useRef(false);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
@@ -88,7 +100,7 @@ export default function PerfilScreen() {
     try {
       setCargando(true);
       setError('');
-      setCantidadSeguidores(null);
+      setEstadisticas(null);
 
       const token = await SecureStore.getItemAsync('token');
 
@@ -147,34 +159,28 @@ export default function PerfilScreen() {
           datosPerfilArtista.perfilArtista || null
         );
 
-        // El mismo endpoint que utiliza el perfil público para el contador.
-        // Si falla, no interrumpimos la carga del perfil ni de las canciones.
+        // Las estadísticas no deben bloquear el resto del perfil si falla la consulta.
         try {
-          const respuestaSeguidores = await fetch(
-            `http://192.168.1.5:3000/api/seguimientos/artistas/${usuarioCargado.id}/estado`,
-            {
-              method: 'GET',
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
+          const respuestaEstadisticas = await fetch(
+            `http://192.168.1.5:3000/api/perfiles-artista/${usuarioCargado.id}/estadisticas`
           );
-
-          if (respuestaSeguidores.ok) {
-            const datosSeguidores = await respuestaSeguidores.json();
+          if (respuestaEstadisticas.ok) {
+            const datos: EstadisticasArtista = await respuestaEstadisticas.json();
             if (
-              typeof datosSeguidores.cantidadSeguidores === 'number' &&
-              Number.isFinite(datosSeguidores.cantidadSeguidores)
+              Number.isFinite(datos.oyentesUnicos) &&
+              Number.isFinite(datos.reproduccionesTotales) &&
+              Number.isFinite(datos.cantidadSeguidores)
             ) {
-              setCantidadSeguidores(datosSeguidores.cantidadSeguidores);
+              setEstadisticas(datos);
             }
           } else {
-            console.warn('No fue posible cargar el contador de seguidores.');
+            console.warn('No fue posible cargar las estadísticas del artista.');
           }
-        } catch (errorSeguidores) {
-          console.warn('Error al consultar seguidores:', errorSeguidores);
+        } catch (errorEstadisticas) {
+          console.warn('Error al consultar estadísticas:', errorEstadisticas);
         }
-                const respuestaCanciones = await fetch(
+
+        const respuestaCanciones = await fetch(
           'http://192.168.1.5:3000/api/canciones/me',
           {
             method: 'GET',
@@ -199,9 +205,10 @@ export default function PerfilScreen() {
         setCanciones(
           datosCanciones.canciones || []
         );
+        await cargarInteracciones(token);
       } else {
         setPerfilArtista(null);
-        setCantidadSeguidores(null);
+        setEstadisticas(null);
         setCanciones([]);
       }
     } catch (error) {
@@ -211,6 +218,54 @@ export default function PerfilScreen() {
     } finally {
       setCargando(false);
     }
+  };
+
+  const cargarInteracciones = async (token: string) => {
+    await Promise.all([
+      { ruta: 'me-gustas', actualizar: setMeGustas },
+      { ruta: 'guardadas', actualizar: setGuardadas },
+    ].map(async ({ ruta, actualizar }) => {
+      try {
+        const respuesta = await fetch(`http://192.168.1.5:3000/api/${ruta}/me`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!respuesta.ok) throw new Error('No se pudo cargar ' + ruta);
+        const datos = await respuesta.json();
+        actualizar((datos.canciones || []).map((item: { id: string }) => item.id));
+      } catch (error) { console.warn('Error al cargar interacciones:', error); }
+    }));
+  };
+
+  const alternarInteraccion = async (cancionId: string, tipo: 'me-gustas' | 'guardadas') => {
+    const esLike = tipo === 'me-gustas';
+    const bloqueo = esLike ? bloqueoMeGusta : bloqueoGuardada;
+    if (bloqueo.current) return;
+    bloqueo.current = true;
+    const setProcesando = esLike ? setProcesandoMeGusta : setProcesandoGuardada;
+    const actuales = esLike ? meGustas : guardadas;
+    const actualizar = esLike ? setMeGustas : setGuardadas;
+    setProcesando(cancionId);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) { Alert.alert('Sesión', 'Inicia sesión para continuar.'); return; }
+      const respuesta = await fetch(`http://192.168.1.5:3000/api/${tipo}/${cancionId}`, {
+        method: actuales.includes(cancionId) ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.message || 'No se pudo actualizar la canción.');
+      const activo = esLike ? datos.meGusta === true : datos.guardada === true;
+      actualizar((anterior) => activo ? [...new Set([...anterior, cancionId])] : anterior.filter((id) => id !== cancionId));
+    } catch (error) {
+      Alert.alert(esLike ? 'Me gusta' : 'Guardadas', error instanceof Error ? error.message : 'Error de conexión.');
+    } finally { bloqueo.current = false; setProcesando(null); }
+  };
+
+  const compartirCancion = async (cancion: Cancion) => {
+    if (!usuario || !perfilArtista) return;
+    const nombreArtista = perfilArtista.nombreArtistico || usuario.nombreUsuario;
+    const enlace = `https://under-music.vercel.app/cancion/${cancion.id}`;
+    const mensaje = `🎵 ¡Escucha "${cancion.titulo}" de ${nombreArtista} en UnderMusic!\n\nDescubre música emergente, conoce nuevos artistas y apoya el talento independiente.\n\n🔗 ${enlace}`;
+    try { await Share.share({ message: mensaje, title: cancion.titulo }); }
+    catch (error) { console.error('Error al compartir canción:', error); Alert.alert('Compartir canción', 'No fue posible abrir las opciones para compartir.'); }
   };
 
   const compartirMiPerfil = async () => {
@@ -366,17 +421,32 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                 </Text>
               </View>
 
-              {esArtista && cantidadSeguidores !== null ? (
-                <View style={styles.followersContainer}>
-                  <Ionicons name="people-outline" size={23} color="#D66BFF" />
-                  <Text style={styles.followersLabel}>
-                    {cantidadSeguidores}{' '}
-                    {cantidadSeguidores === 1 ? 'seguidor' : 'seguidores'}
-                  </Text>
-                </View>
-              ) : null}
             </View>
           </View>
+
+          {esArtista && perfilArtista ? (
+            <View style={styles.statisticsSection}>
+              <View style={styles.statisticsHeader}>
+                <Ionicons name="stats-chart-outline" size={22} color="#D69AFF" />
+                <Text style={styles.statisticsTitle}>Tus estadísticas musicales</Text>
+              </View>
+              <View style={styles.statisticsRow}>
+                {([
+                  { clave: 'oyentesUnicos', etiqueta: 'Oyentes únicos', icono: 'headset-outline', color: '#54E6FF' },
+                  { clave: 'reproduccionesTotales', etiqueta: 'Reproducciones', icono: 'play-circle-outline', color: '#FF68B7' },
+                  { clave: 'cantidadSeguidores', etiqueta: 'Seguidores', icono: 'people-outline', color: '#D69AFF' },
+                ] as const).map((item) => (
+                  <View key={item.clave} style={styles.statCard}>
+                    <Ionicons name={item.icono} size={23} color={item.color} />
+                    <Text style={styles.statValue}>
+                      {estadisticas ? estadisticas[item.clave].toLocaleString('es-CL') : '—'}
+                    </Text>
+                    <Text style={styles.statLabel}>{item.etiqueta}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           {esArtista && perfilArtista ? (
             <Pressable
@@ -670,6 +740,19 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                               </Text>
                             ) : null}
                           </View>
+
+                          <Pressable style={styles.songShareButton} onPress={(event) => { event.stopPropagation(); void compartirCancion(cancion); }} accessibilityRole="button" accessibilityLabel={`Compartir ${cancion.titulo}`}>
+                            <Ionicons name="share-social-outline" size={18} color="#DDB9FF" />
+                          </Pressable>
+                          <Pressable style={styles.songQueueButton} disabled accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel={`Añadir ${cancion.titulo} a la cola (próximamente)`}>
+                            <Ionicons name="list-outline" size={19} color="#B7A6C7" />
+                          </Pressable>
+                          <Pressable style={styles.songSaveButton} disabled={procesandoGuardada !== null} onPress={(event) => { event.stopPropagation(); void alternarInteraccion(cancion.id, 'guardadas'); }} accessibilityRole="button" accessibilityLabel={`${guardadas.includes(cancion.id) ? 'Quitar de Guardadas' : 'Guardar'} ${cancion.titulo}`}>
+                            {procesandoGuardada === cancion.id ? <ActivityIndicator size="small" color="#54E6FF" /> : <Ionicons name={guardadas.includes(cancion.id) ? 'bookmark' : 'bookmark-outline'} size={19} color={guardadas.includes(cancion.id) ? '#54E6FF' : '#9FD9E5'} />}
+                          </Pressable>
+                          <Pressable style={styles.songLikeButton} disabled={procesandoMeGusta !== null} onPress={(event) => { event.stopPropagation(); void alternarInteraccion(cancion.id, 'me-gustas'); }} accessibilityRole="button" accessibilityLabel={`${meGustas.includes(cancion.id) ? 'Quitar Me gusta de' : 'Dar Me gusta a'} ${cancion.titulo}`}>
+                            {procesandoMeGusta === cancion.id ? <ActivityIndicator size="small" color="#FF68B7" /> : <Ionicons name={meGustas.includes(cancion.id) ? 'heart' : 'heart-outline'} size={20} color={meGustas.includes(cancion.id) ? '#FF68B7' : '#E7A1C8'} />}
+                          </Pressable>
 
                           <Pressable
                             style={styles.songPlayButton}
@@ -1062,6 +1145,55 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  statisticsSection: {
+    width: '100%',
+    maxWidth: 550,
+    alignSelf: 'center',
+    marginTop: 22,
+  },
+  statisticsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    marginBottom: 12,
+  },
+  statisticsTitle: {
+    color: '#E9D8F6',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  statisticsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 112,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 3,
+    borderRadius: 16,
+    backgroundColor: 'rgba(25, 12, 48, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 92, 240, 0.52)',
+  },
+  statValue: {
+    color: '#FFFFFF',
+    fontSize: 23,
+    fontWeight: '800',
+    marginTop: 7,
+  },
+  statLabel: {
+    color: '#CFC0DF',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+
   artistContent: {
     width: '100%',
     marginTop: 30,
@@ -1293,21 +1425,62 @@ publishSongButtonText: {
   backgroundColor: 'rgba(112, 48, 161, 0.22)',
 },
 
-songPlayButton: {
-  width: 42,
-  height: 42,
-  borderRadius: 21,
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: 'rgba(137, 63, 209, 0.72)',
-  borderWidth: 1,
-  borderColor: 'rgba(214, 151, 255, 0.55)',
-},
+  songShareButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 13,
+    backgroundColor: 'rgba(120, 66, 175, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(190, 129, 255, 0.45)',
+  },
+
+  songQueueButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 7, backgroundColor: 'rgba(91, 80, 112, 0.13)', borderWidth: 1, borderColor: 'rgba(170, 151, 192, 0.32)', opacity: 0.55 },
+
+  songSaveButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 13,
+    backgroundColor: 'rgba(24, 119, 143, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(84, 230, 255, 0.45)',
+  },
+
+  songLikeButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 7,
+    backgroundColor: 'rgba(145, 35, 100, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 104, 183, 0.45)',
+  },
+
+  songPlayButton: {
+    marginLeft: 25,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor:
+      'rgba(137, 63, 209, 0.72)',
+    borderWidth: 1,
+    borderColor:
+      'rgba(214, 151, 255, 0.55)',
+  },
 
   songInfo: {
     flex: 1,
     marginLeft: 13,
-    marginRight: 8,
+    marginRight: 5,
   },
 
   songTitle: {
