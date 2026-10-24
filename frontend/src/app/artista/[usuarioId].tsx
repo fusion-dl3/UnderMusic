@@ -662,7 +662,14 @@ router.push('/reproductor');
 
             <View style={styles.profileStatsRow}>
               <View style={styles.locationRow}>
-                <Ionicons name="location-outline" size={22} color="#54E6FF" />
+                <View style={styles.locationIcon}>
+                  <Ionicons
+                    name="location-outline"
+                    size={24}
+                    color="#54E6FF"
+                    style={{ transform: [{ translateY: -6 }] }}
+                  />
+                </View>
                 <Text style={styles.locationText}>
                   {artista.ubicacion.comuna}, {artista.ubicacion.region}
                 </Text>
@@ -1535,14 +1542,20 @@ header: {
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 1,
-    maxWidth: '100%',
+    minWidth: 0,
+    gap: 5,
+  },
+  locationIcon: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{ translateY: 1 }],
   },
   locationText: {
     flexShrink: 1,
     color: '#D7D1DE',
     fontSize: 15,
-    marginLeft: 6,
-    textAlign: 'center',
+    lineHeight: 21,
+    textAlign: 'left',
   },
   followersRow: {
     flexDirection: 'row',

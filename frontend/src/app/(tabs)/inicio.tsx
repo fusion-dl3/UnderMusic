@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SecureStore from 'expo-secure-store';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { CancionReproductor, usePlayer } from '@/context/PlayerContext';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -192,6 +192,32 @@ function BordeLuzAnimado({
 }
 
 export default function InicioScreen() {
+  // Permite abrir Lanzamientos recientes directamente desde Biblioteca.
+  const { seccion, solicitud } = useLocalSearchParams<{ seccion?: string; solicitud?: string }>();
+  const scrollPrincipalRef = useRef<ScrollView>(null);
+  const posicionLanzamientosRef = useRef<number | null>(null);
+  const solicitudPendienteRef = useRef<string | null>(null);
+  const ultimaSolicitudAtendidaRef = useRef<string | null>(null);
+
+  const desplazarALanzamientos = useCallback(() => {
+    if (!solicitudPendienteRef.current || posicionLanzamientosRef.current === null) return;
+    scrollPrincipalRef.current?.scrollTo({
+      y: Math.max(0, posicionLanzamientosRef.current - 12),
+      animated: true,
+    });
+    ultimaSolicitudAtendidaRef.current = solicitudPendienteRef.current;
+    solicitudPendienteRef.current = null;
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (seccion === 'lanzamientos' && solicitud && solicitud !== ultimaSolicitudAtendidaRef.current) {
+        solicitudPendienteRef.current = solicitud;
+        desplazarALanzamientos();
+      }
+    }, [seccion, solicitud, desplazarALanzamientos])
+  );
+
   const [actualizando, setActualizando] = useState(false);
   const [cancionesRecientes, setCancionesRecientes] = useState<CancionReciente[]>([]);
   const [cargandoRecientes, setCargandoRecientes] = useState(true);
@@ -590,6 +616,7 @@ export default function InicioScreen() {
         edges={['top']}
       >
         <ScrollView
+          ref={scrollPrincipalRef}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -967,7 +994,13 @@ export default function InicioScreen() {
             )}
           </View>
 
-          <View style={[styles.recientesSeccion, { marginTop: 38 }]}>
+          <View
+            style={[styles.recientesSeccion, { marginTop: 38 }]}
+            onLayout={(evento) => {
+              posicionLanzamientosRef.current = evento.nativeEvent.layout.y;
+              desplazarALanzamientos();
+            }}
+          >
             <View style={styles.recientesEncabezado}>
               <View style={styles.recientesTituloFila}>
                 <Ionicons name="radio-outline" size={23} color="#D77CFF" />

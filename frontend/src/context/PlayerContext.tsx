@@ -37,7 +37,8 @@ type PlayerContextType = {
 
   reproducirCancion: (
     cancion: CancionReproductor,
-    nuevaCola?: CancionReproductor[]
+    nuevaCola?: CancionReproductor[],
+    reiniciar?: boolean
   ) => void;
 
   alternarReproduccion: () => void;
@@ -157,7 +158,8 @@ const escuchaRef = useRef({
 };
   const reproducirCancion = (
     cancion: CancionReproductor,
-    nuevaCola?: CancionReproductor[]
+    nuevaCola?: CancionReproductor[],
+    reiniciar = false
   ) => {
     if (nuevaCola) {
       setCola(nuevaCola);
@@ -168,7 +170,7 @@ const escuchaRef = useRef({
     const esLaMismaCancion =
       cancionActual?.id === cancion.id;
 
-    if (esLaMismaCancion) {
+    if (esLaMismaCancion && !reiniciar) {
       if (!status.playing) {
         player.play();
       }

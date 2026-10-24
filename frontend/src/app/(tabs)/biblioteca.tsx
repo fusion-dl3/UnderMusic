@@ -49,6 +49,8 @@ type CancionFavorita = {
   fotoArtista?: string | null;
 };
 
+const LIMITE_VISTA_GENERAL = 10;
+
 const filtros: { id: Exclude<FiltroBiblioteca, 'todos'>; titulo: string }[] = [
   { id: 'artistas', titulo: 'Artistas seguidos' },
   { id: 'gustas', titulo: 'Me gusta' },
@@ -58,6 +60,8 @@ const filtros: { id: Exclude<FiltroBiblioteca, 'todos'>; titulo: string }[] = [
 export default function BibliotecaScreen() {
   const { width: anchoPantalla } = useWindowDimensions();
   const [filtroActivo, setFiltroActivo] = useState<FiltroBiblioteca>('todos');
+  const [modoGustas, setModoGustas] = useState<'orden' | 'aleatorio'>('orden');
+  const [modoGuardadas, setModoGuardadas] = useState<'orden' | 'aleatorio'>('orden');
   const [artistas, setArtistas] = useState<ArtistaSeguido[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -202,6 +206,10 @@ export default function BibliotecaScreen() {
     }, [intento])
   );
 
+  const abrirFiltroCompleto = (filtro: Exclude<FiltroBiblioteca, 'todos'>) => {
+    setFiltroActivo(filtro);
+  };
+
   const mostrarArtistas = filtroActivo === 'todos' || filtroActivo === 'artistas';
   const mostrarGustas = filtroActivo === 'todos' || filtroActivo === 'gustas';
   const mostrarGuardadas = filtroActivo === 'todos' || filtroActivo === 'guardadas';
@@ -244,7 +252,7 @@ export default function BibliotecaScreen() {
 
     return (
       <View style={styles.listaArtistas}>
-        {artistas.map(artista => {
+        {(filtroActivo === 'todos' ? artistas.slice(0, LIMITE_VISTA_GENERAL) : artistas).map(artista => {
           const ubicacion = [artista.ubicacion?.comuna, artista.ubicacion?.region]
             .filter(Boolean).join(', ');
           return (
@@ -313,6 +321,78 @@ export default function BibliotecaScreen() {
     router.push('/reproductor');
   };
 
+  // Inicia un recorrido nuevo y completo de la colección seleccionada.
+  const reproducirColeccion = (tipo: 'gustas' | 'guardadas') => {
+    const canciones = tipo === 'gustas' ? cancionesFavoritas : cancionesGuardadas;
+    const modo = tipo === 'gustas' ? modoGustas : modoGuardadas;
+    const lista: CancionReproductor[] = canciones
+      .filter(c => !!c.audioId)
+      .map(c => ({
+        id: c.id,
+        audioId: c.audioId as string,
+        titulo: c.titulo,
+        nombreArtista: c.nombreArtista || 'Artista',
+        usuarioId: c.usuarioId,
+        portadaId: c.portadaId,
+        fotoArtista: c.fotoArtista || null,
+      }));
+
+    if (lista.length === 0) return;
+
+    if (modo === 'aleatorio') {
+      // Fisher-Yates: cada canción aparece una sola vez por recorrido.
+      for (let i = lista.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [lista[i], lista[j]] = [lista[j], lista[i]];
+      }
+    }
+
+    reproducirCancion(lista[0], lista, true);
+    router.push('/reproductor');
+  };
+
+  const renderizarControlesColeccion = (tipo: 'gustas' | 'guardadas') => {
+    const esGustas = tipo === 'gustas';
+    const modo = esGustas ? modoGustas : modoGuardadas;
+    const cantidadReproducible = (esGustas ? cancionesFavoritas : cancionesGuardadas)
+      .filter(c => !!c.audioId).length;
+    return (
+      <View style={styles.controlesColeccion}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Reproducir todas las canciones ${esGustas ? 'con Me gusta' : 'guardadas'}`}
+          disabled={cantidadReproducible === 0}
+          onPress={() => reproducirColeccion(tipo)}
+          style={({ pressed }) => [
+            styles.reproducirTodoBoton,
+            esGustas ? styles.reproducirTodoGustas : styles.reproducirTodoGuardadas,
+            pressed && styles.presionado,
+            cantidadReproducible === 0 && styles.botonDesactivado,
+          ]}
+        >
+          <Ionicons name="play-circle-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.reproducirTodoTexto}>Reproducir todo</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Modo de reproducción: ${modo === 'orden' ? 'en orden' : 'aleatorio'}. Cambiar modo`}
+          onPress={() => {
+            if (esGustas) setModoGustas(actual => actual === 'orden' ? 'aleatorio' : 'orden');
+            else setModoGuardadas(actual => actual === 'orden' ? 'aleatorio' : 'orden');
+          }}
+          style={({ pressed }) => [
+            styles.modoBoton,
+            esGustas ? styles.modoGustas : styles.modoGuardadas,
+            pressed && styles.presionado,
+          ]}
+        >
+          <Ionicons name={modo === 'orden' ? 'list-outline' : 'shuffle-outline'} size={18} color={esGustas ? '#FFB5DA' : '#8BEAFF'} />
+          <Text style={styles.modoTexto}>{modo === 'orden' ? 'En orden' : 'Aleatorio'}</Text>
+        </Pressable>
+      </View>
+    );
+  };
+
   const quitarMeGusta = async (cancion: CancionFavorita) => {
     if (quitandoMeGusta) return;
     setQuitandoMeGusta(cancion.id);
@@ -358,7 +438,7 @@ export default function BibliotecaScreen() {
     );
     return (
       <View style={styles.listaArtistas}>
-        {cancionesFavoritas.map(cancion => (
+        {(filtroActivo === 'todos' ? cancionesFavoritas.slice(0, LIMITE_VISTA_GENERAL) : cancionesFavoritas).map(cancion => (
           <Pressable
             key={cancion.id}
             accessibilityRole="button"
@@ -466,7 +546,7 @@ export default function BibliotecaScreen() {
     );
     return (
       <View style={styles.listaArtistas}>
-        {cancionesGuardadas.map(cancion => (
+        {(filtroActivo === 'todos' ? cancionesGuardadas.slice(0, LIMITE_VISTA_GENERAL) : cancionesGuardadas).map(cancion => (
           <Pressable
             key={cancion.id}
             accessibilityRole="button"
@@ -574,31 +654,9 @@ export default function BibliotecaScreen() {
               <Text style={styles.seccionTitulo}>Artistas seguidos</Text>
               <Ionicons name="people-outline" size={23} color="#DB78FF" />
             </View>
+            <Text style={styles.contadorSeccion}>{!cargando && !error ? `${artistas.length} artistas seguidos` : ''}</Text>
             {renderizarArtistas()}
-          </View>
-        )}
-
-        {mostrarGustas && (
-          <View style={styles.seccion}>
-            <View style={styles.seccionEncabezado}>
-              <Text style={styles.seccionTitulo}>Me gusta</Text>
-              <Ionicons name="heart-outline" size={23} color="#FF73BB" />
-            </View>
-            {renderizarMeGustas()}
-          </View>
-        )}
-
-        {mostrarGuardadas && (
-          <View style={styles.seccion}>
-            <View style={styles.seccionEncabezado}>
-              <Text style={styles.seccionTitulo}>Canciones guardadas</Text>
-              <Ionicons name="bookmark-outline" size={23} color="#65E3FF" />
-            </View>
-            {renderizarGuardadas()}
-          </View>
-        )}
-
-        {!cargando && !error && artistas.length === 0 && filtroActivo === 'todos' && (
+        {!cargando && !error && artistas.length === 0 && (
           <View style={styles.descubrirCaja}>
             <Ionicons name="sparkles-outline" size={25} color="#E4A3FF" />
             <Text style={styles.descubrirTitulo}>Descubre artistas emergentes</Text>
@@ -614,6 +672,74 @@ export default function BibliotecaScreen() {
             </Pressable>
           </View>
         )}
+            {!cargando && !error && artistas.length > LIMITE_VISTA_GENERAL && filtroActivo === 'todos' && (
+              <Pressable onPress={() => abrirFiltroCompleto('artistas')} style={styles.verTodosBoton}>
+                <Text style={styles.verTodosTexto}>Ver todos los artistas seguidos ({artistas.length})</Text>
+                <Ionicons name="arrow-forward" size={18} color="#E4A3FF" />
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {mostrarGustas && (
+          <View style={styles.seccion}>
+            <View style={styles.seccionEncabezado}>
+              <Text style={styles.seccionTitulo}>Me gusta</Text>
+              <Ionicons name="heart-outline" size={23} color="#FF73BB" />
+            </View>
+            <Text style={styles.contadorSeccion}>{!cargandoGustas && !errorGustas ? `${cancionesFavoritas.length} canciones con Me gusta` : ''}</Text>
+            {filtroActivo === 'gustas' && !cargandoGustas && !errorGustas && cancionesFavoritas.length > 0 && renderizarControlesColeccion('gustas')}
+            {renderizarMeGustas()}
+            {!cargandoGustas && !errorGustas && cancionesFavoritas.length === 0 && (
+              <View style={[styles.descubrirCaja, styles.descubrirGustas]}>
+                <Ionicons name="musical-notes-outline" size={25} color="#FF85C3" />
+                <Text style={styles.descubrirTitulo}>Encuentra canciones que te gusten</Text>
+                <Text style={styles.descubrirDescripcion}>Descubre nuevos lanzamientos y encuentra tu próxima canción favorita.</Text>
+                <Pressable onPress={() => router.push({ pathname: '/(tabs)/inicio', params: { seccion: 'lanzamientos', solicitud: String(Date.now()) } })} style={({ pressed }) => [styles.descubrirBoton, styles.descubrirBotonGustas, pressed && styles.presionado]}>
+                  <Text style={styles.descubrirBotonTexto}>Descubrir canciones</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            )}
+            {!cargandoGustas && !errorGustas && cancionesFavoritas.length > LIMITE_VISTA_GENERAL && filtroActivo === 'todos' && (
+              <Pressable onPress={() => abrirFiltroCompleto('gustas')} style={styles.verTodosBoton}>
+                <Text style={styles.verTodosTexto}>Ver todas las canciones con Me gusta ({cancionesFavoritas.length})</Text>
+                <Ionicons name="arrow-forward" size={18} color="#FF85C3" />
+              </Pressable>
+            )} 
+          </View>
+        )}
+
+        {mostrarGuardadas && (
+          <View style={styles.seccion}>
+            <View style={styles.seccionEncabezado}>
+              <Text style={styles.seccionTitulo}>Canciones guardadas</Text>
+              <Ionicons name="bookmark-outline" size={23} color="#65E3FF" />
+            </View>
+            <Text style={styles.contadorSeccion}>{!cargandoGuardadas && !errorGuardadas ? `${cancionesGuardadas.length} canciones guardadas` : ''}</Text>
+            {filtroActivo === 'guardadas' && !cargandoGuardadas && !errorGuardadas && cancionesGuardadas.length > 0 && renderizarControlesColeccion('guardadas')}
+            {renderizarGuardadas()}
+            {!cargandoGuardadas && !errorGuardadas && cancionesGuardadas.length === 0 && (
+              <View style={[styles.descubrirCaja, styles.descubrirGuardadas]}>
+                <Ionicons name="compass-outline" size={25} color="#65E3FF" />
+                <Text style={styles.descubrirTitulo}>Amplía tu colección musical</Text>
+                <Text style={styles.descubrirDescripcion}>Explora los lanzamientos recientes y guarda tus descubrimientos.</Text>
+                <Pressable onPress={() => router.push({ pathname: '/(tabs)/inicio', params: { seccion: 'lanzamientos', solicitud: String(Date.now()) } })} style={({ pressed }) => [styles.descubrirBoton, styles.descubrirBotonGuardadas, pressed && styles.presionado]}>
+                  <Text style={styles.descubrirBotonTexto}>Explorar lanzamientos</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            )}
+            {!cargandoGuardadas && !errorGuardadas && cancionesGuardadas.length > LIMITE_VISTA_GENERAL && filtroActivo === 'todos' && (
+              <Pressable onPress={() => abrirFiltroCompleto('guardadas')} style={styles.verTodosBoton}>
+                <Text style={styles.verTodosTexto}>Ver todas las canciones guardadas ({cancionesGuardadas.length})</Text>
+                <Ionicons name="arrow-forward" size={18} color="#65E3FF" />
+              </Pressable>
+            )} 
+          </View>
+        )}
+
+
       </ScrollView>
       </SafeAreaView>
     </ImageBackground>
@@ -622,6 +748,15 @@ export default function BibliotecaScreen() {
 
 const styles = StyleSheet.create({
   contenedor: { flex: 1, backgroundColor: '#020106' },
+  controlesColeccion: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 },
+  reproducirTodoBoton: { flex: 1, minWidth: 0, minHeight: 47, borderRadius: 25, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 10 },
+  reproducirTodoGustas: { backgroundColor: '#A83379' },
+  reproducirTodoGuardadas: { backgroundColor: '#12677D' },
+  reproducirTodoTexto: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  modoBoton: { minHeight: 47, minWidth: 120, borderRadius: 25, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12 },
+  modoGustas: { backgroundColor: '#351D30', borderColor: '#A84E80' },
+  modoGuardadas: { backgroundColor: '#123B49', borderColor: '#397E92' },
+  modoTexto: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   scroll: { flex: 1 },
   safeArea: { flex: 1 },
   contenido: { width: '100%', maxWidth: 700, alignSelf: 'center', paddingHorizontal: 28, paddingTop: 30, paddingBottom: 55 },
@@ -665,6 +800,13 @@ const styles = StyleSheet.create({
   estadoDescripcion: { color: '#BDAEC9', fontSize: 13, lineHeight: 19, textAlign: 'center' },
   reintentarBoton: { backgroundColor: '#6F2BA1', paddingHorizontal: 22, paddingVertical: 10, borderRadius: 20, marginTop: 7 },
   reintentarTexto: { color: '#FFFFFF', fontWeight: '800' },
+  contadorSeccion: { color: '#BDAEC9', fontSize: 12, marginBottom: 10 },
+  verTodosBoton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 16, marginTop: 12, backgroundColor: 'rgba(46, 23, 65, 0.85)', borderWidth: 1, borderColor: '#79429C' },
+  verTodosTexto: { color: '#F0D6FF', fontWeight: '700', fontSize: 13, textAlign: 'center', flexShrink: 1 },
+  descubrirGustas: { backgroundColor: '#371528', borderColor: '#A84E80', marginTop: 12 },
+  descubrirGuardadas: { backgroundColor: '#102E3A', borderColor: '#397E92', marginTop: 12 },
+  descubrirBotonGustas: { backgroundColor: '#A83379' },
+  descubrirBotonGuardadas: { backgroundColor: '#12677D' },
   descubrirCaja: { borderRadius: 20, padding: 22, alignItems: 'center', gap: 10, backgroundColor: '#241237', borderWidth: 1, borderColor: '#A34ED1', marginBottom: 12 },
   descubrirTitulo: { color: '#FFFFFF', fontSize: 18, fontWeight: '800', textAlign: 'center' },
   descubrirDescripcion: { color: '#C9B6D7', fontSize: 13, lineHeight: 20, textAlign: 'center' },

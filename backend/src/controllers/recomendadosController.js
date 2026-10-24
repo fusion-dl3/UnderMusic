@@ -117,8 +117,9 @@ async function obtenerArtistasRecomendados(req, res) {
     );
 
     const perfilesValidos = perfiles.filter((perfil) =>
-      usuariosPorId.has(perfil.usuarioId.toString())
-    );
+  perfil.usuarioId.toString() !== usuarioId &&
+  usuariosPorId.has(perfil.usuarioId.toString())
+);
 
     const coincideGenero = (perfil) => {
       if (generosPreferidos.length === 0) {
