@@ -1,4 +1,5 @@
 const { ObjectId } = require('mongodb');
+const { getCancionesCollection } = require('../models/cancionModel');
 
 const {
   getPerfilesArtistaCollection
@@ -88,6 +89,7 @@ async function obtenerMiPerfilArtista(req, res) {
         instagram: perfilArtista.instagram || '',
         facebook: perfilArtista.facebook || '',
         twitter: perfilArtista.twitter || '',
+        cancionesDestacadas: (perfilArtista.cancionesDestacadas || []).map(String),
         perfilCompleto: perfilArtista.perfilCompleto === true
       }
     });
@@ -257,6 +259,7 @@ async function actualizarMiPerfilArtista(req, res) {
         instagram: perfilArtista.instagram || '',
         facebook: perfilArtista.facebook || '',
         twitter: perfilArtista.twitter || '',
+        cancionesDestacadas: (perfilArtista.cancionesDestacadas || []).map(String),
         perfilCompleto: perfilArtista.perfilCompleto === true
       }
     });
@@ -355,7 +358,9 @@ async function obtenerPerfilArtistaPublico(req, res) {
           perfilArtista.facebook || '',
 
         twitter:
-          perfilArtista.twitter || ''
+          perfilArtista.twitter || '',
+
+        cancionesDestacadas: (perfilArtista.cancionesDestacadas || []).map(String)
       }
     });
   } catch (error) {
@@ -492,9 +497,53 @@ async function buscarArtistas(req, res) {
   }
 }
 
+// Seleccion manual de hasta tres canciones propias, en orden de prioridad.
+async function actualizarCancionesDestacadas(req, res) {
+  try {
+    if (req.usuario.rol !== 'artista') {
+      return res.status(403).json({ message: 'Esta función está disponible solo para artistas' });
+    }
+    const ids = req.body?.cancionesDestacadas;
+    if (!Array.isArray(ids) || ids.length > 3 ||
+        ids.some((id) => typeof id !== 'string' || !/^[a-fA-F0-9]{24}$/.test(id))) {
+      return res.status(400).json({ message: 'Selecciona entre cero y tres identificadores válidos de canciones' });
+    }
+    const normalizados = ids.map((id) => id.toLowerCase());
+    if (new Set(normalizados).size !== normalizados.length) {
+      return res.status(400).json({ message: 'No puedes destacar la misma canción más de una vez' });
+    }
+    const usuarioId = new ObjectId(req.usuario.id);
+    const perfiles = getPerfilesArtistaCollection();
+    const perfil = await perfiles.findOne({ usuarioId });
+    if (!perfil) {
+      return res.status(404).json({ message: 'Primero debes crear tu perfil de artista' });
+    }
+    if (normalizados.length) {
+      const cantidadPropias = await getCancionesCollection().countDocuments({
+        _id: { $in: normalizados.map((id) => new ObjectId(id)) },
+        usuarioId
+      });
+      if (cantidadPropias !== normalizados.length) {
+        return res.status(400).json({ message: 'Solo puedes destacar canciones publicadas por tu cuenta' });
+      }
+    }
+    await perfiles.updateOne({ _id: perfil._id }, {
+      $set: { cancionesDestacadas: normalizados, fechaActualizacion: new Date() }
+    });
+    return res.status(200).json({
+      message: normalizados.length ? 'Canciones destacadas actualizadas' : 'Orden automático restablecido',
+      cancionesDestacadas: normalizados
+    });
+  } catch (error) {
+    console.error('Error al actualizar canciones destacadas:', error);
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  }
+}
+
 module.exports = {
   obtenerMiPerfilArtista,
   actualizarMiPerfilArtista,
+  actualizarCancionesDestacadas,
   obtenerPerfilArtistaPublico,
   buscarArtistas
 };

@@ -4,6 +4,7 @@ const express = require('express');
 const {
   obtenerMiPerfilArtista,
   actualizarMiPerfilArtista,
+  actualizarCancionesDestacadas,
   obtenerPerfilArtistaPublico,
   buscarArtistas,
 } = require('../controllers/perfilArtistaController');
@@ -21,12 +22,10 @@ const {
 } = require('../controllers/cercanosController');
 
 const {
-  obtenerEstadisticasArtista,
-} = require('../controllers/estadisticasArtistaController');
-
-const {
   verificarToken,
 } = require('../middlewares/authMiddleware');
+
+const { obtenerEstadisticasArtista } = require('../controllers/estadisticasArtistaController');
 
 const router = express.Router();
 
@@ -41,6 +40,13 @@ router.patch(
   '/me',
   verificarToken,
   actualizarMiPerfilArtista
+);
+
+// Canciones fijadas manualmente en el Top 3 del perfil.
+router.patch(
+  '/me/canciones-destacadas',
+  verificarToken,
+  actualizarCancionesDestacadas
 );
 
 // Artistas destacados personalizados.
@@ -67,11 +73,8 @@ router.get(
 // Búsqueda de artistas.
 router.get('/buscar', buscarArtistas);
 
-// Estadísticas públicas de un artista.
-router.get(
-  '/:usuarioId/estadisticas',
-  obtenerEstadisticasArtista
-);
+// Estadísticas públicas del artista. Registrar antes de /:usuarioId.
+router.get('/:usuarioId/estadisticas', obtenerEstadisticasArtista);
 
 // Perfil público de un artista.
 // Esta ruta debe permanecer después de las rutas específicas.

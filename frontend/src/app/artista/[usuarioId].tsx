@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import * as SecureStore from 'expo-secure-store';
 import {
@@ -20,6 +21,8 @@ import {
 
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Alert,
   Image,
   ImageBackground,
@@ -27,6 +30,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  useWindowDimensions,
   Share,
   StyleSheet,
   Text,
@@ -54,6 +58,7 @@ type ArtistaPublico = {
   instagram: string;
   facebook: string;
   twitter: string;
+  cancionesDestacadas?: string[];
 };
 
 type EstadisticasArtista = {
@@ -72,10 +77,65 @@ type Cancion = {
   portadaId: string | null;
   fechaPublicacion: string;
   fechaActualizacion: string;
+  reproducciones?: number;
+  meGustas?: number;
+  guardados?: number;
 };
 
 export default function PerfilArtistaPublicoScreen() {
   const insets = useSafeAreaInsets();
+  const { width: anchoPantalla } = useWindowDimensions();
+  // Un solo reflejo blanco que avanza por el contorno (4 tramos).
+  // Animamos traslaciones reales, no una línea simétrica que parece inmóvil.
+  const avanceBorde = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    avanceBorde.setValue(0);
+    const animacion = Animated.loop(
+      Animated.timing(avanceBorde, {
+        toValue: 4,
+        duration: 8500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    animacion.start();
+    return () => animacion.stop();
+  }, [avanceBorde]);
+  const posicionDestello = (lado: number) => {
+    const recorrido = 138;
+    const rangosOpacidad = lado === 0
+      ? [0, 0.02, 0.98, 1, 4]
+      : [0, lado, lado + 0.02, lado + 0.98, lado + 1, 4].filter((v, i, a) => i === 0 || v !== a[i - 1]);
+    const valoresOpacidad = lado === 0
+  ? [0, 1, 1, 0, 0, 0]
+  : [0, 0, 1, 1, 0, 0];
+
+const valoresOpacidadAjustados = rangosOpacidad.map(
+  (_, indice) => valoresOpacidad[
+    Math.min(indice, valoresOpacidad.length - 1)
+  ]
+);
+
+return {
+  opacity: avanceBorde.interpolate({
+    inputRange: rangosOpacidad,
+    outputRange: valoresOpacidadAjustados,
+    extrapolate: 'clamp',
+  }),
+      transform: [
+        { translateX: avanceBorde.interpolate({
+          inputRange: [0, 1, 2, 3, 4],
+          outputRange: lado === 0 ? [0, recorrido, recorrido, recorrido, recorrido]
+            : lado === 2 ? [0, 0, 0, -recorrido, -recorrido] : [0, 0, 0, 0, 0],
+        }) },
+        { translateY: avanceBorde.interpolate({
+          inputRange: [0, 1, 2, 3, 4],
+          outputRange: lado === 1 ? [0, 0, recorrido, recorrido, recorrido]
+            : lado === 3 ? [0, 0, 0, 0, -recorrido] : [0, 0, 0, 0, 0],
+        }) },
+      ],
+    };
+  };
   const [avisoSeguimiento, setAvisoSeguimiento] = useState<{ mensaje: string; siguiendo: boolean } | null>(null);
   const temporizadorAviso = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -114,6 +174,8 @@ export default function PerfilArtistaPublicoScreen() {
 
   const [canciones, setCanciones] =
     useState<Cancion[]>([]);
+  const [mostrarTodasCanciones, setMostrarTodasCanciones] = useState(false);
+  const [ordenCanciones, setOrdenCanciones] = useState<'escuchadas' | 'recientes'>('escuchadas');
 
   const [meGustas, setMeGustas] = useState<string[]>([]);
   const [procesandoMeGusta, setProcesandoMeGusta] = useState<string | null>(null);
@@ -194,6 +256,10 @@ export default function PerfilArtistaPublicoScreen() {
       });
       const datos = await respuesta.json();
       if (!respuesta.ok) throw new Error(datos.message || 'No se pudo actualizar Me gusta.');
+      setCanciones((anteriores) => anteriores.map((item) => item.id === cancionId ? {
+        ...item,
+        meGustas: Math.max(0, (item.meGustas ?? 0) + (datos.meGusta === true ? 1 : -1)),
+      } : item));
       setMeGustas((anteriores) =>
         datos.meGusta === true
           ? [...new Set([...anteriores, cancionId])]
@@ -240,6 +306,10 @@ export default function PerfilArtistaPublicoScreen() {
       });
       const datos = await respuesta.json();
       if (!respuesta.ok) throw new Error(datos.message || 'No se pudo actualizar Guardadas.');
+      setCanciones((anteriores) => anteriores.map((item) => item.id === cancionId ? {
+        ...item,
+        guardados: Math.max(0, (item.guardados ?? 0) + (datos.guardada === true ? 1 : -1)),
+      } : item));
       setGuardadas((anteriores) =>
         datos.guardada === true
           ? [...new Set([...anteriores, cancionId])]
@@ -409,6 +479,30 @@ export default function PerfilArtistaPublicoScreen() {
       setCargando(false);
     }
   };
+
+  // Las fijadas manualmente tienen prioridad; completar sin duplicados con las más escuchadas.
+  const idsFijados = (artista?.cancionesDestacadas ?? []).slice(0, 3);
+  const cancionesFijadas = idsFijados
+    .map((id) => canciones.find((cancion) => cancion.id === id))
+    .filter((cancion): cancion is Cancion => Boolean(cancion));
+  const idsUsados = new Set(cancionesFijadas.map((cancion) => cancion.id));
+  const cancionesPopulares = [
+    ...cancionesFijadas,
+    ...canciones.filter((cancion) => !idsUsados.has(cancion.id))
+      .sort((a, b) => (b.reproducciones ?? 0) - (a.reproducciones ?? 0) ||
+        new Date(b.fechaPublicacion).getTime() - new Date(a.fechaPublicacion).getTime()),
+  ].slice(0, 3);
+  const idsTop3 = new Set(cancionesPopulares.map((cancion) => cancion.id));
+  const restantesPorReproducciones = canciones
+    .filter((cancion) => !idsTop3.has(cancion.id))
+    .sort((a, b) => (b.reproducciones ?? 0) - (a.reproducciones ?? 0) ||
+      new Date(b.fechaPublicacion).getTime() - new Date(a.fechaPublicacion).getTime());
+  const cancionesPorPopularidad = [...cancionesPopulares, ...restantesPorReproducciones];
+  const cancionesPorFecha = [...canciones].sort((a, b) =>
+    new Date(b.fechaPublicacion).getTime() - new Date(a.fechaPublicacion).getTime());
+  const cancionesVisibles = mostrarTodasCanciones
+    ? (ordenCanciones === 'recientes' ? cancionesPorFecha : cancionesPorPopularidad)
+    : cancionesPopulares;
 
   // No se muestra el correo privado de registro: solo correoContacto.
   const contactoOpciones: {
@@ -643,29 +737,31 @@ router.push('/reproductor');
           <View
             style={styles.profileSection}
           >
-            <View
-              style={styles.avatarBorder}
-            >
-              <View style={styles.avatar}>
-                {artista.fotoPerfil ? (
-                  <Image
-                    source={{
-                      uri:
-                        `${API_URL}/api/usuarios/` +
-                        `foto-perfil/${artista.fotoPerfil}`,
-                    }}
-                    style={
-                      styles.avatarImage
-                    }
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <Ionicons
-                    name="person"
-                    size={72}
-                    color="#D8A6FF"
-                  />
-                )}
+            <View style={styles.avatarGlowContainer}>
+              <View style={styles.avatarBorder}>
+                <Animated.View pointerEvents="none" style={[styles.avatarGlintHorizontal, { top: 0, left: 0 }, posicionDestello(0)]}>
+                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0,y:0.5}} end={{x:1,y:0.5}} />
+                </Animated.View>
+                <Animated.View pointerEvents="none" style={[styles.avatarGlintVertical, { top: 0, right: 0 }, posicionDestello(1)]}>
+                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0.5,y:0}} end={{x:0.5,y:1}} />
+                </Animated.View>
+                <Animated.View pointerEvents="none" style={[styles.avatarGlintHorizontal, { bottom: 0, right: 0 }, posicionDestello(2)]}>
+                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0,y:0.5}} end={{x:1,y:0.5}} />
+                </Animated.View>
+                <Animated.View pointerEvents="none" style={[styles.avatarGlintVertical, { bottom: 0, left: 0 }, posicionDestello(3)]}>
+                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0.5,y:0}} end={{x:0.5,y:1}} />
+                </Animated.View>
+                <View style={styles.avatar}>
+                  {artista.fotoPerfil ? (
+                    <Image
+                      source={{ uri: `${API_URL}/api/usuarios/foto-perfil/${artista.fotoPerfil}` }}
+                      style={styles.avatarImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Ionicons name="person" size={72} color="#D8A6FF" />
+                  )}
+                </View>
               </View>
             </View>
 
@@ -939,16 +1035,32 @@ router.push('/reproductor');
                 </Text>
               </View>
 
+              {mostrarTodasCanciones && canciones.length > 3 ? (
+                <View style={styles.songSortRow}>
+                  <Pressable onPress={() => setOrdenCanciones('escuchadas')}
+                    style={[styles.songSortButton, ordenCanciones === 'escuchadas' && styles.songSortActive]}>
+                    <Ionicons name="trending-up-outline" size={16} color="#EED5FF" />
+                    <Text style={styles.songSortText}>Más escuchadas</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setOrdenCanciones('recientes')}
+                    style={[styles.songSortButton, ordenCanciones === 'recientes' && styles.songSortActive]}>
+                    <Ionicons name="time-outline" size={16} color="#EED5FF" />
+                    <Text style={styles.songSortText}>Más recientes</Text>
+                  </Pressable>
+                </View>
+              ) : null}
               {canciones.length > 0 ? (
                 <View
                   style={styles.songsList}
                 >
-                  {canciones.map(
+                  {cancionesVisibles.map(
                     (cancion) => (
+                      <View key={cancion.id} style={styles.songCardOuter}>
                       <Pressable
   key={cancion.id}
   style={({ pressed }) => [
     styles.songCard,
+    anchoPantalla < 700 && styles.songCardCompact,
     cancionActual?.id === cancion.id &&
       pressed &&
       styles.songCardPressed,
@@ -1038,8 +1150,9 @@ router.push('/reproductor');
                           ) : null}
                         </View>
 
+                        <View style={[styles.songActionsRow, anchoPantalla < 700 && styles.songActionsCompact]}>
                          <Pressable
-                           style={styles.songShareButton}
+                           style={[styles.songShareButton, anchoPantalla < 700 && styles.songActionCompact]}
                            disabled={esVistaPrevia}
                            onPress={() => compartirCancion(cancion)}
                            accessibilityRole="button"
@@ -1053,7 +1166,7 @@ router.push('/reproductor');
                          </Pressable>
 
                         <Pressable
-                           style={styles.songQueueButton}
+                           style={[styles.songQueueButton, anchoPantalla < 700 && styles.songActionCompact]}
                            disabled
                            accessibilityRole="button"
                            accessibilityState={{ disabled: true }}
@@ -1063,7 +1176,7 @@ router.push('/reproductor');
                          </Pressable>
 
                          <Pressable
-                          style={styles.songSaveButton}
+                          style={[styles.songSaveButton, anchoPantalla < 700 && styles.songActionCompact]}
                           disabled={esVistaPrevia || procesandoGuardada !== null}
                           onPress={() => alternarGuardada(cancion.id)}
                           accessibilityRole="button"
@@ -1081,7 +1194,7 @@ router.push('/reproductor');
                         </Pressable>
 
                         <Pressable
-                          style={styles.songLikeButton}
+                          style={[styles.songLikeButton, anchoPantalla < 700 && styles.songActionCompact]}
                           disabled={esVistaPrevia || procesandoMeGusta !== null}
                           onPress={() => alternarMeGusta(cancion.id)}
                           accessibilityRole="button"
@@ -1128,7 +1241,15 @@ router.push('/reproductor');
                             }
                           />
                         </Pressable>
+                        </View>
+                        <View style={[styles.songMetricsDivider, anchoPantalla < 700 && styles.songMetricsDividerCompact]} />
+                        <View style={[styles.songMetricsColumn, anchoPantalla < 700 && styles.songMetricsColumnCompact]}>
+                          <View style={styles.songMetricItem}><Ionicons name="play-outline" size={13} color="#FF68B7" /><Text style={styles.songMetricText}>{(cancion.reproducciones ?? 0).toLocaleString('es-CL')}</Text></View>
+                          <View style={styles.songMetricItem}><Ionicons name="heart-outline" size={13} color="#FF68B7" /><Text style={styles.songMetricText}>{(cancion.meGustas ?? 0).toLocaleString('es-CL')}</Text></View>
+                          <View style={styles.songMetricItem}><Ionicons name="bookmark-outline" size={13} color="#54E6FF" /><Text style={styles.songMetricText}>{(cancion.guardados ?? 0).toLocaleString('es-CL')}</Text></View>
+                        </View>
                       </Pressable>
+                      </View>
                     )
                   )}
                 </View>
@@ -1170,6 +1291,19 @@ router.push('/reproductor');
                   </Text>
                 </View>
               )}
+              {canciones.length > 3 ? (
+                <Pressable
+                  onPress={() => { setMostrarTodasCanciones((actual) => !actual); setOrdenCanciones('escuchadas'); }}
+                  style={({ pressed }) => [styles.showAllSongsButton, pressed && styles.buttonPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={mostrarTodasCanciones ? 'Mostrar canciones más populares' : 'Ver todas las canciones'}
+                >
+                  <Text style={styles.showAllSongsText}>
+                    {mostrarTodasCanciones ? 'Mostrar menos' : `Ver todas las canciones (${canciones.length})`}
+                  </Text>
+                  <Ionicons name={mostrarTodasCanciones ? 'chevron-up' : 'chevron-down'} size={20} color="#E5BBFF" />
+                </Pressable>
+              ) : null}
             </View>
           </View>
         </ScrollView>
@@ -1519,13 +1653,16 @@ header: {
     alignItems: 'center',
   },
 
+  avatarGlowContainer: { width: 174, height: 174, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  avatarGlintHorizontal: { position: 'absolute', width: 32, height: 4, borderRadius: 2, zIndex: 2 },
+  avatarGlintVertical: { position: 'absolute', width: 4, height: 32, borderRadius: 2, zIndex: 2 },
   avatarBorder: {
     width: 170,
     height: 170,
     borderRadius: 43,
     padding: 3,
     backgroundColor: '#7C39FF',
-    marginBottom: 18,
+    overflow: 'hidden',
   },
 
   avatar: {
@@ -1788,6 +1925,29 @@ header: {
     gap: 12,
   },
 
+  songCardOuter: { width: '100%' },
+  songCardCompact: { flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, paddingRight: 71 },
+  songActionsCompact: { width: '100%', justifyContent: 'space-between', marginRight: -84 },
+  songActionCompact: { marginLeft: 0, marginRight: 0 },
+  songMetricsDividerCompact: { position: 'absolute', right: 56, top: 17, height: 52, marginLeft: 0, marginRight: 0 },
+  songMetricsColumnCompact: { position: 'absolute', right: 4, top: 15, width: 47 },
+  songSortRow: { flexDirection: 'row', gap: 9, marginBottom: 14, flexWrap: 'wrap' },
+  songSortButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(167,106,215,0.48)', backgroundColor: 'rgba(54,23,84,0.65)' },
+  songSortActive: { borderColor: '#D69AFF', backgroundColor: 'rgba(120,48,174,0.8)' },
+  songSortText: { color: '#F1DEFF', fontSize: 12, fontWeight: '700' },
+  songActionsRow: { flexDirection: 'row', alignItems: 'center', transform: [{ translateX: 6 }] },
+  songMetricsDivider: { width: 1, height: 56, backgroundColor: 'rgba(193,134,241,0.48)', marginLeft: 11, marginRight: 10, transform: [{ translateX: 6 }] },
+  songMetricsColumn: { width: 43, justifyContent: 'center', gap: 4, transform: [{ translateX: 6 }] },
+  songMetricItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  songMetricText: { color: '#D9C9E6', fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  showAllSongsButton: {
+    alignSelf: 'center', flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 8, paddingVertical: 13,
+    paddingHorizontal: 21, marginTop: 19, borderRadius: 22,
+    backgroundColor: 'rgba(98, 35, 153, 0.48)',
+    borderWidth: 1, borderColor: 'rgba(190, 129, 255, 0.65)',
+  },
+  showAllSongsText: { color: '#F0D9FF', fontSize: 14, fontWeight: '800' },
   songCard: {
     width: '100%',
     minHeight: 82,
@@ -1826,6 +1986,7 @@ header: {
 
   songInfo: {
     flex: 1,
+    minWidth: 65,
     marginLeft: 13,
     marginRight: 8,
   },

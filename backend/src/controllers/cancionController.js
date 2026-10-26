@@ -16,6 +16,18 @@ const {
 } = require('../models/perfilArtistaModel');
 
 const {
+  getReproduccionesCollection
+} = require('../models/reproduccionModel');
+
+const {
+  getMeGustasCollection
+} = require('../models/meGustaModel');
+
+const {
+  getGuardadasCollection
+} = require('../models/guardadaModel');
+
+const {
   GENEROS_MUSICALES
 } = require('../constants/generos');
 
@@ -588,6 +600,45 @@ async function subirPortadaCancion(req, res) {
     });
   }
 }
+// Obtener estadísticas por canción con consultas agrupadas, sin alterar
+// las colecciones ni la lógica de registro de reproducciones/interacciones.
+async function obtenerEstadisticasPorCancion(canciones) {
+  const ids = canciones.map((cancion) => cancion._id);
+  const estadisticas = new Map(
+    ids.map((id) => [id.toString(), {
+      reproducciones: 0,
+      meGustas: 0,
+      guardados: 0
+    }])
+  );
+
+  if (ids.length === 0) return estadisticas;
+
+  const pipeline = [
+    { $match: { cancionId: { $in: ids } } },
+    { $group: { _id: '$cancionId', total: { $sum: 1 } } }
+  ];
+
+  const [reproducciones, meGustas, guardados] = await Promise.all([
+    getReproduccionesCollection().aggregate(pipeline).toArray(),
+    getMeGustasCollection().aggregate(pipeline).toArray(),
+    getGuardadasCollection().aggregate(pipeline).toArray()
+  ]);
+
+  for (const [campo, registros] of [
+    ['reproducciones', reproducciones],
+    ['meGustas', meGustas],
+    ['guardados', guardados]
+  ]) {
+    for (const registro of registros) {
+      const entrada = estadisticas.get(registro._id.toString());
+      if (entrada) entrada[campo] = registro.total;
+    }
+  }
+
+  return estadisticas;
+}
+
 async function obtenerMisCanciones(req, res) {
   try {
     if (req.usuario.rol !== 'artista') {
@@ -613,6 +664,8 @@ async function obtenerMisCanciones(req, res) {
         })
         .toArray();
 
+    const estadisticasPorCancion = await obtenerEstadisticasPorCancion(cancionesEncontradas);
+
     const resultado =
       cancionesEncontradas.map(
         (cancion) => ({
@@ -630,7 +683,8 @@ async function obtenerMisCanciones(req, res) {
           fechaPublicacion:
             cancion.fechaPublicacion,
           fechaActualizacion:
-            cancion.fechaActualizacion
+            cancion.fechaActualizacion,
+          ...estadisticasPorCancion.get(cancion._id.toString())
         })
       );
 
@@ -693,6 +747,8 @@ async function obtenerCancionesArtista(req, res) {
         })
         .toArray();
 
+    const estadisticasPorCancion = await obtenerEstadisticasPorCancion(cancionesEncontradas);
+
     const resultado =
       cancionesEncontradas.map(
         (cancion) => ({
@@ -710,7 +766,8 @@ async function obtenerCancionesArtista(req, res) {
           fechaPublicacion:
             cancion.fechaPublicacion,
           fechaActualizacion:
-            cancion.fechaActualizacion
+            cancion.fechaActualizacion,
+          ...estadisticasPorCancion.get(cancion._id.toString())
         })
       );
 
@@ -1133,8 +1190,85 @@ async function obtenerArtistasPorGenero(req, res) {
 }
 
 
+
+// Editar solo metadatos permitidos; audio y género principal permanecen intactos.
+async function editarCancion(req, res) {
+  try {
+    if (req.usuario.rol !== 'artista') return res.status(403).json({ message: 'Solo artistas' });
+    const { cancionId } = req.params;
+    if (!ObjectId.isValid(cancionId)) return res.status(400).json({ message: 'ID de canción inválido' });
+    const permitidos = ['titulo', 'album', 'generosSecundarios'];
+    const campos = Object.keys(req.body || {});
+    if (!campos.length || campos.some(campo => !permitidos.includes(campo))) {
+      return res.status(400).json({ message: 'Solo puedes editar título, álbum y géneros secundarios' });
+    }
+    const canciones = getCancionesCollection();
+    const filtro = { _id: new ObjectId(cancionId), usuarioId: new ObjectId(req.usuario.id) };
+    const actual = await canciones.findOne(filtro);
+    if (!actual) return res.status(404).json({ message: 'Canción no encontrada' });
+    const cambios = {};
+    if (Object.hasOwn(req.body, 'titulo')) {
+      if (typeof req.body.titulo !== 'string' || !req.body.titulo.trim()) return res.status(400).json({ message: 'El título es obligatorio' });
+      cambios.titulo = req.body.titulo.trim();
+    }
+    if (Object.hasOwn(req.body, 'album')) {
+      if (typeof req.body.album !== 'string') return res.status(400).json({ message: 'Álbum inválido' });
+      cambios.album = req.body.album.trim();
+    }
+    if (Object.hasOwn(req.body, 'generosSecundarios')) {
+      const recibidos = req.body.generosSecundarios;
+      if (!Array.isArray(recibidos) || recibidos.some(g => typeof g !== 'string')) return res.status(400).json({ message: 'Géneros secundarios inválidos' });
+      const generos = [...new Set(recibidos.map(g => g.trim()))];
+      if (generos.length > 3 || generos.some(g => !GENEROS_MUSICALES.includes(g) || g === actual.generoPrincipal)) {
+        return res.status(400).json({ message: 'Selecciona hasta tres géneros secundarios válidos, distintos del principal' });
+      }
+      cambios.generosSecundarios = generos;
+    }
+    cambios.fechaActualizacion = new Date();
+    await canciones.updateOne(filtro, { $set: cambios });
+    return res.json({ message: 'Canción actualizada correctamente' });
+  } catch (error) {
+    console.error('Error al editar canción:', error);
+    return res.status(500).json({ message: 'No fue posible editar la canción' });
+  }
+}
+
+async function eliminarCancion(req, res) {
+  try {
+    if (req.usuario.rol !== 'artista') return res.status(403).json({ message: 'Solo artistas' });
+    const { cancionId } = req.params;
+    if (!ObjectId.isValid(cancionId)) return res.status(400).json({ message: 'ID de canción inválido' });
+    const id = new ObjectId(cancionId);
+    const usuarioId = new ObjectId(req.usuario.id);
+    const canciones = getCancionesCollection();
+    const cancion = await canciones.findOne({ _id: id, usuarioId });
+    if (!cancion) return res.status(404).json({ message: 'Canción no encontrada' });
+    // Eliminar primero el registro evita que el catálogo exponga una canción borrada.
+    await canciones.deleteOne({ _id: id, usuarioId });
+    await Promise.allSettled([
+      getReproduccionesCollection().deleteMany({ cancionId: id }),
+      getMeGustasCollection().deleteMany({ cancionId: id }),
+      getGuardadasCollection().deleteMany({ cancionId: id }),
+      getPerfilesArtistaCollection().updateOne({ usuarioId }, { $pull: { cancionesDestacadas: { $in: [cancionId, id] } } })
+    ]);
+    const db = getDatabase();
+    for (const [bucketName, archivoId] of [['audiosCanciones', cancion.audioId], ['portadasCanciones', cancion.portadaId]]) {
+      if (archivoId && ObjectId.isValid(archivoId)) {
+        try { await new GridFSBucket(db, { bucketName }).delete(new ObjectId(archivoId)); }
+        catch (errorArchivo) { console.error('Archivo huérfano al eliminar canción:', errorArchivo); }
+      }
+    }
+    return res.json({ message: 'Canción eliminada correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar canción:', error);
+    return res.status(500).json({ message: 'No fue posible eliminar la canción' });
+  }
+}
+
 module.exports = {
   publicarCancion,
+  editarCancion,
+  eliminarCancion,
   subirPortadaCancion,
   obtenerMisCanciones,
   obtenerCancionesArtista,

@@ -1,15 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CancionReproductor,
   usePlayer,
 } from '@/context/PlayerContext';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  useWindowDimensions,
   Image,
   ImageBackground,
+  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -59,6 +64,9 @@ type Cancion = {
   portadaId: string | null;
   fechaPublicacion: string;
   fechaActualizacion: string;
+  reproducciones?: number;
+  meGustas?: number;
+  guardados?: number;
 };
 
 type EstadisticasArtista = {
@@ -68,6 +76,62 @@ type EstadisticasArtista = {
 };
 
 export default function PerfilScreen() {
+  const { width: anchoPantalla } = useWindowDimensions();
+  // Un solo reflejo blanco que avanza por el contorno (4 tramos).
+  // Animamos traslaciones reales, no una línea simétrica que parece inmóvil.
+  const avanceBorde = useRef(new Animated.Value(0)).current;
+  const [cicloDestello, setCicloDestello] = useState(0);
+  useFocusEffect(useCallback(() => {
+    avanceBorde.stopAnimation();
+    avanceBorde.setValue(0);
+    setCicloDestello(actual => actual + 1);
+    const animacion = Animated.loop(
+      Animated.timing(avanceBorde, {
+        toValue: 4,
+        duration: 8500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    animacion.start();
+    return () => { animacion.stop(); avanceBorde.stopAnimation(); };
+  }, [avanceBorde]));
+  const posicionDestello = (lado: number) => {
+    const recorrido = 138;
+    const rangosOpacidad = lado === 0
+      ? [0, 0.02, 0.98, 1, 4]
+      : [0, lado, lado + 0.02, lado + 0.98, lado + 1, 4].filter((v, i, a) => i === 0 || v !== a[i - 1]);
+    const valoresOpacidad = lado === 0
+  ? [0, 1, 1, 0, 0, 0]
+  : [0, 0, 1, 1, 0, 0];
+
+const valoresOpacidadAjustados = rangosOpacidad.map(
+  (_, indice) => valoresOpacidad[
+    Math.min(indice, valoresOpacidad.length - 1)
+  ]
+);
+
+return {
+  opacity: avanceBorde.interpolate({
+    inputRange: rangosOpacidad,
+    outputRange: valoresOpacidadAjustados,
+    extrapolate: 'clamp',
+  }),
+      transform: [
+        { translateX: avanceBorde.interpolate({
+          inputRange: [0, 1, 2, 3, 4],
+          outputRange: lado === 0 ? [0, recorrido, recorrido, recorrido, recorrido]
+            : lado === 2 ? [0, 0, 0, -recorrido, -recorrido] : [0, 0, 0, 0, 0],
+        }) },
+        { translateY: avanceBorde.interpolate({
+          inputRange: [0, 1, 2, 3, 4],
+          outputRange: lado === 1 ? [0, 0, recorrido, recorrido, recorrido]
+            : lado === 3 ? [0, 0, 0, 0, -recorrido] : [0, 0, 0, 0, 0],
+        }) },
+      ],
+    };
+  };
+
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const {
   cancionActual,
@@ -89,6 +153,31 @@ export default function PerfilScreen() {
   const bloqueoGuardada = useRef(false);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [cancionMenu, setCancionMenu] = useState<Cancion | null>(null);
+  const confirmarEliminarCancion = (cancion: Cancion) => {
+    Alert.alert('Eliminar canción', `¿Eliminar definitivamente «${cancion.titulo}»? Esta acción no se puede deshacer.`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: async () => {
+        try {
+          const token = await SecureStore.getItemAsync('token');
+          if (!token) { Alert.alert('Sesión', 'Debes iniciar sesión.'); return; }
+          const respuesta = await fetch(`http://192.168.1.5:3000/api/canciones/${cancion.id}`, {
+            method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+          });
+          const datos = await respuesta.json();
+          if (!respuesta.ok) throw new Error(datos.message || 'No fue posible eliminar la canción.');
+          setCanciones(actuales => actuales.filter(item => item.id !== cancion.id));
+          await cargarPerfil();
+        } catch (error) {
+          Alert.alert('Error', error instanceof Error ? error.message : 'No fue posible eliminar la canción.');
+        }
+      } },
+    ]);
+  };
+
+  const mostrarOpcionesCancion = (cancion: Cancion) => {
+    setCancionMenu(cancion);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -358,8 +447,9 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
           </View>
 
           <View style={styles.profileSection}>
+            <View style={styles.avatarGlowContainer}>
             <View style={styles.avatarBorder}>
-              <View style={styles.avatar}>
+                              <View style={styles.avatar}>
                 {usuario.fotoPerfil ? (
                   <Image
                     source={{
@@ -376,6 +466,19 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                   />
                 )}
               </View>
+                <Animated.View key={`destello-${cicloDestello}-0`} pointerEvents="none" style={[styles.avatarGlintHorizontal, { top: 0, left: 0 }, posicionDestello(0)]}>
+                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0,y:0.5}} end={{x:1,y:0.5}} />
+                </Animated.View>
+                <Animated.View key={`destello-${cicloDestello}-1`} pointerEvents="none" style={[styles.avatarGlintVertical, { top: 0, right: 0 }, posicionDestello(1)]}>
+                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0.5,y:0}} end={{x:0.5,y:1}} />
+                </Animated.View>
+                <Animated.View key={`destello-${cicloDestello}-2`} pointerEvents="none" style={[styles.avatarGlintHorizontal, { bottom: 0, right: 0 }, posicionDestello(2)]}>
+                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0,y:0.5}} end={{x:1,y:0.5}} />
+                </Animated.View>
+                <Animated.View key={`destello-${cicloDestello}-3`} pointerEvents="none" style={[styles.avatarGlintVertical, { bottom: 0, left: 0 }, posicionDestello(3)]}>
+                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0.5,y:0}} end={{x:0.5,y:1}} />
+                </Animated.View>
+            </View>
             </View>
 
             {esArtista &&
@@ -427,7 +530,11 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
           {esArtista && perfilArtista ? (
             <View style={styles.statisticsSection}>
               <View style={styles.statisticsHeader}>
-                <Ionicons name="stats-chart-outline" size={22} color="#D69AFF" />
+                <View style={styles.statsAnimatedIcon}>
+                  {[0, 1, 2, 3].map((indice) => (
+                    <AnimatedStatsBar key={indice} indice={indice} />
+                  ))}
+                </View>
                 <Text style={styles.statisticsTitle}>Tus estadísticas musicales</Text>
               </View>
               <View style={styles.statisticsRow}>
@@ -679,6 +786,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                           key={cancion.id}
                           style={({ pressed }) => [
                             styles.songCard,
+                            anchoPantalla < 620 && styles.songCardTwoRows,
                             cancionActual?.id === cancion.id &&
                               pressed &&
                               styles.songCardPressed,
@@ -695,7 +803,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                               source={{
                                 uri: `http://192.168.1.5:3000/api/canciones/portadas/${cancion.portadaId}`,
                               }}
-                              style={styles.songCover}
+                              style={[styles.songCover, anchoPantalla < 1050 && styles.songCoverCompact]}
                               resizeMode="cover"
                             />
                           ) : usuario.fotoPerfil ? (
@@ -703,7 +811,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                               source={{
                                 uri: `http://192.168.1.5:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
                               }}
-                              style={styles.songCover}
+                              style={[styles.songCover, anchoPantalla < 1050 && styles.songCoverCompact]}
                               resizeMode="cover"
                             />
                           ) : (
@@ -716,7 +824,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                             </View>
                           )}
 
-                          <View style={styles.songInfo}>
+                          <View style={[styles.songInfo, anchoPantalla < 620 && styles.songInfoCompact]}>
                             <Text
                               style={styles.songTitle}
                               numberOfLines={1}
@@ -741,21 +849,22 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                             ) : null}
                           </View>
 
-                          <Pressable style={styles.songShareButton} onPress={(event) => { event.stopPropagation(); void compartirCancion(cancion); }} accessibilityRole="button" accessibilityLabel={`Compartir ${cancion.titulo}`}>
+                          <View style={[styles.songActionsRow, anchoPantalla < 620 && styles.songActionsTwoRows]}>
+                          <Pressable style={[styles.songShareButton, anchoPantalla < 620 && styles.songActionCompact]} onPress={(event) => { event.stopPropagation(); void compartirCancion(cancion); }} accessibilityRole="button" accessibilityLabel={`Compartir ${cancion.titulo}`}>
                             <Ionicons name="share-social-outline" size={18} color="#DDB9FF" />
                           </Pressable>
-                          <Pressable style={styles.songQueueButton} disabled accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel={`Añadir ${cancion.titulo} a la cola (próximamente)`}>
+                          <Pressable style={[styles.songQueueButton, anchoPantalla < 620 && styles.songActionCompact]} disabled accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel={`Añadir ${cancion.titulo} a la cola (próximamente)`}>
                             <Ionicons name="list-outline" size={19} color="#B7A6C7" />
                           </Pressable>
-                          <Pressable style={styles.songSaveButton} disabled={procesandoGuardada !== null} onPress={(event) => { event.stopPropagation(); void alternarInteraccion(cancion.id, 'guardadas'); }} accessibilityRole="button" accessibilityLabel={`${guardadas.includes(cancion.id) ? 'Quitar de Guardadas' : 'Guardar'} ${cancion.titulo}`}>
+                          <Pressable style={[styles.songSaveButton, anchoPantalla < 620 && styles.songActionCompact]} disabled={procesandoGuardada !== null} onPress={(event) => { event.stopPropagation(); void alternarInteraccion(cancion.id, 'guardadas'); }} accessibilityRole="button" accessibilityLabel={`${guardadas.includes(cancion.id) ? 'Quitar de Guardadas' : 'Guardar'} ${cancion.titulo}`}>
                             {procesandoGuardada === cancion.id ? <ActivityIndicator size="small" color="#54E6FF" /> : <Ionicons name={guardadas.includes(cancion.id) ? 'bookmark' : 'bookmark-outline'} size={19} color={guardadas.includes(cancion.id) ? '#54E6FF' : '#9FD9E5'} />}
                           </Pressable>
-                          <Pressable style={styles.songLikeButton} disabled={procesandoMeGusta !== null} onPress={(event) => { event.stopPropagation(); void alternarInteraccion(cancion.id, 'me-gustas'); }} accessibilityRole="button" accessibilityLabel={`${meGustas.includes(cancion.id) ? 'Quitar Me gusta de' : 'Dar Me gusta a'} ${cancion.titulo}`}>
+                          <Pressable style={[styles.songLikeButton, anchoPantalla < 620 && styles.songActionCompact]} disabled={procesandoMeGusta !== null} onPress={(event) => { event.stopPropagation(); void alternarInteraccion(cancion.id, 'me-gustas'); }} accessibilityRole="button" accessibilityLabel={`${meGustas.includes(cancion.id) ? 'Quitar Me gusta de' : 'Dar Me gusta a'} ${cancion.titulo}`}>
                             {procesandoMeGusta === cancion.id ? <ActivityIndicator size="small" color="#FF68B7" /> : <Ionicons name={meGustas.includes(cancion.id) ? 'heart' : 'heart-outline'} size={20} color={meGustas.includes(cancion.id) ? '#FF68B7' : '#E7A1C8'} />}
                           </Pressable>
 
                           <Pressable
-                            style={styles.songPlayButton}
+                            style={[styles.songPlayButton, anchoPantalla < 620 && styles.songActionCompact]}
                             disabled={!cancion.audioId}
                             onPress={(event) => {
                               event.stopPropagation();
@@ -820,6 +929,16 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                               }
                             />
                           </Pressable>
+                          <Pressable style={[styles.songOptionsButton, anchoPantalla < 620 && styles.songActionCompact]} onPress={(event) => { event.stopPropagation(); mostrarOpcionesCancion(cancion); }} accessibilityRole="button" accessibilityLabel={`Opciones de ${cancion.titulo}`}>
+                            <Ionicons name="ellipsis-vertical" size={22} color="#E4C2FF" />
+                          </Pressable>
+                          </View>
+                          <View style={[styles.songMetricsDivider, anchoPantalla < 620 && styles.songMetricsDividerCompact]} />
+                          <View style={[styles.songMetricsColumn, anchoPantalla < 620 && styles.songMetricsColumnCompact]}>
+                            <View style={styles.songMetric}><Ionicons name="play" size={12} color="#FF68B7" /><Text style={styles.songMetricText}>{cancion.reproducciones ?? 0}</Text></View>
+                            <View style={styles.songMetric}><Ionicons name="heart" size={12} color="#FF68B7" /><Text style={styles.songMetricText}>{cancion.meGustas ?? 0}</Text></View>
+                            <View style={styles.songMetric}><Ionicons name="bookmark" size={12} color="#54E6FF" /><Text style={styles.songMetricText}>{cancion.guardados ?? 0}</Text></View>
+                          </View>
                         </Pressable>
                       ))}
                     </View>
@@ -948,8 +1067,99 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
             </View>
           </View>
         </ScrollView>
+        <Modal
+          visible={cancionMenu !== null}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setCancionMenu(null)}
+        >
+          <View style={styles.songMenuOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setCancionMenu(null)} accessibilityLabel="Cerrar opciones" />
+            <View style={styles.songMenuPanel}>
+              <View style={styles.songMenuAccent} />
+              <Text style={styles.songMenuHeading}>Opciones de canción</Text>
+              <Text style={styles.songMenuSubtitle} numberOfLines={2}>{cancionMenu?.titulo}</Text>
+              <Pressable style={styles.songMenuOption} onPress={() => {
+                const cancion = cancionMenu;
+                setCancionMenu(null);
+                if (cancion) router.push({ pathname: '/editar-cancion', params: { cancionId: cancion.id } } as never);
+              }}>
+                <Ionicons name="create-outline" size={22} color="#D9A6FF" />
+                <Text style={styles.songMenuOptionText}>Editar canción</Text>
+                <Ionicons name="chevron-forward" size={19} color="#A88EC3" />
+              </Pressable>
+              <View style={styles.songMenuSeparator} />
+              <Pressable style={styles.songMenuOption} onPress={() => {
+                const cancion = cancionMenu;
+                setCancionMenu(null);
+                if (cancion) confirmarEliminarCancion(cancion);
+              }}>
+                <Ionicons name="trash-outline" size={22} color="#FF78B3" />
+                <Text style={[styles.songMenuOptionText, { color: '#FF9AC7' }]}>Eliminar canción</Text>
+                <Ionicons name="chevron-forward" size={19} color="#A88EC3" />
+              </Pressable>
+              <Pressable style={styles.songMenuCancel} onPress={() => setCancionMenu(null)}>
+                <Text style={styles.songMenuCancelText}>Cancelar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </ImageBackground>
+  );
+}
+
+function AnimatedStatsBar({ indice }: { indice: number }) {
+  const iniciales = [0.46, 0.78, 0.58, 0.9];
+  const escala = useRef(new Animated.Value(iniciales[indice] ?? 0.6)).current;
+
+  useEffect(() => {
+    const destinos = [
+      [0.78, 0.42, 0.9, 0.56],
+      [0.48, 0.92, 0.62, 0.84],
+      [0.88, 0.55, 0.75, 0.42],
+      [0.54, 0.8, 0.5, 0.94],
+    ];
+    const animacion = Animated.loop(
+      Animated.sequence([
+        Animated.delay(indice * 140),
+        ...destinos.map((paso) =>
+          Animated.timing(escala, {
+            toValue: paso[indice],
+            duration: 900 + indice * 130,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          })
+        ),
+      ])
+    );
+    animacion.start();
+    return () => animacion.stop();
+  }, [escala, indice]);
+
+  // React Native escala desde el centro. Esta traslación mantiene
+  // el borde inferior en el mismo punto durante toda la animación.
+  const desplazamiento = escala.interpolate({
+    inputRange: [0, 1],
+    outputRange: [10, 0],
+  });
+
+  return (
+    <View style={{ width: 4, height: 20, overflow: 'hidden' }}>
+      <Animated.View
+        style={[
+          styles.statsBar,
+          {
+            height: 20,
+            transform: [
+              { scaleY: escala },
+              { translateY: desplazamiento },
+            ],
+          },
+        ]}
+      />
+    </View>
   );
 }
 
@@ -1021,13 +1231,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  avatarGlowContainer: { width: 174, height: 174, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  avatarGlintHorizontal: { position: 'absolute', width: 32, height: 4, borderRadius: 2, zIndex: 2 },
+  avatarGlintVertical: { position: 'absolute', width: 4, height: 32, borderRadius: 2, zIndex: 2 },
   avatarBorder: {
+    overflow: 'hidden',
     width: 170,
     height: 170,
     borderRadius: 43,
     padding: 3,
     backgroundColor: '#7C39FF',
-    marginBottom: 18,
   },
 
   avatar: {
@@ -1151,6 +1364,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 22,
   },
+  statsAnimatedIcon: { height: 20, width: 32, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 3, marginBottom: 3 },
+  statsBar: { width: 4, borderTopLeftRadius: 2, borderTopRightRadius: 2, backgroundColor: '#D69AFF' },
   statisticsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1426,45 +1641,49 @@ publishSongButtonText: {
 },
 
   songShareButton: {
+    flexShrink: 0,
     width: 42,
     height: 42,
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 13,
+    marginRight: 0,
     backgroundColor: 'rgba(120, 66, 175, 0.18)',
     borderWidth: 1,
     borderColor: 'rgba(190, 129, 255, 0.45)',
   },
 
-  songQueueButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 7, backgroundColor: 'rgba(91, 80, 112, 0.13)', borderWidth: 1, borderColor: 'rgba(170, 151, 192, 0.32)', opacity: 0.55 },
+  songQueueButton: { flexShrink: 0, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 0, backgroundColor: 'rgba(91, 80, 112, 0.13)', borderWidth: 1, borderColor: 'rgba(170, 151, 192, 0.32)', opacity: 0.55 },
 
   songSaveButton: {
+    flexShrink: 0,
     width: 42,
     height: 42,
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 13,
+    marginRight: 0,
     backgroundColor: 'rgba(24, 119, 143, 0.18)',
     borderWidth: 1,
     borderColor: 'rgba(84, 230, 255, 0.45)',
   },
 
   songLikeButton: {
+    flexShrink: 0,
     width: 42,
     height: 42,
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 7,
+    marginRight: 0,
     backgroundColor: 'rgba(145, 35, 100, 0.18)',
     borderWidth: 1,
     borderColor: 'rgba(255, 104, 183, 0.45)',
   },
 
   songPlayButton: {
-    marginLeft: 25,
+    flexShrink: 0,
+    marginLeft: 0,
     width: 42,
     height: 42,
     borderRadius: 21,
@@ -1477,10 +1696,25 @@ publishSongButtonText: {
       'rgba(214, 151, 255, 0.55)',
   },
 
+  songCardCompact: { paddingHorizontal: 9, paddingRight: 66 },
+  songCardTwoRows: { flexWrap: 'wrap', paddingHorizontal: 12, paddingRight: 66, minHeight: 126, alignContent: 'center' },
+  songActionsRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 0, flexGrow: 0, gap: 8 },
+  songActionsTwoRows: { width: '100%', justifyContent: 'flex-end', marginTop: 10, paddingLeft: 0, paddingRight: 18, gap: 8 },
+  songCoverCompact: { width: 48, height: 48 },
+  songInfoCompact: { minWidth: 0, marginLeft: 10, marginRight: 2, flexShrink: 1 },
+  songActionCompact: { width: 43, height: 43, minWidth: 43, flexBasis: 43, flexGrow: 0, flexShrink: 0, marginLeft: 0, marginRight: 0, borderRadius: 22 },
+  songMetricsDividerCompact: { position: 'absolute', right: 61, top: 36, height: 52, marginLeft: 0, marginRight: 0, transform: [] },
+  songMetricsColumnCompact: { position: 'absolute', right: 6, top: 34, width: 43, transform: [] },
+  songOptionsButton: { width: 32, minWidth: 32, flexShrink: 0, height: 42, alignItems: 'center', justifyContent: 'center', marginLeft: 0, marginRight: 0 },
+  songMetricsDivider: { width: 1, height: 56, backgroundColor: 'rgba(193,134,241,0.48)', marginLeft: 10, marginRight: 10 },
+  songMetricsColumn: { width: 43, flexShrink: 0, justifyContent: 'center', gap: 4 },
+  songMetric: { flexDirection: 'row', gap: 3, alignItems: 'center' },
+  songMetricText: { color: '#D9C9E6', fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'] },
   songInfo: {
     flex: 1,
     marginLeft: 13,
     marginRight: 5,
+    minWidth: 0,
   },
 
   songTitle: {
@@ -1684,4 +1918,15 @@ publishSongButtonText: {
     textAlign: 'center',
     marginTop: 12,
   },
+  songMenuOverlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: 'rgba(3, 1, 15, 0.76)' },
+  songMenuPanel: { width: '100%', maxWidth: 420, alignSelf: 'center', overflow: 'hidden', borderRadius: 24, backgroundColor: '#150A2D', borderWidth: 1, borderColor: 'rgba(174, 89, 255, 0.65)', paddingHorizontal: 20, paddingTop: 23, paddingBottom: 16 },
+  songMenuAccent: { position: 'absolute', top: 0, left: 30, right: 30, height: 2, backgroundColor: '#AD58F6' },
+  songMenuHeading: { fontSize: 19, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' },
+  songMenuSubtitle: { color: '#BFA6D9', fontSize: 14, textAlign: 'center', marginTop: 5, marginBottom: 20 },
+  songMenuOption: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 8 },
+  songMenuOptionText: { color: '#F0E5FF', fontSize: 16, fontWeight: '700', flex: 1 },
+  songMenuSeparator: { height: 1, backgroundColor: 'rgba(181, 124, 235, 0.2)', marginHorizontal: 6 },
+  songMenuCancel: { marginTop: 18, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: 'rgba(120, 52, 188, 0.28)', borderWidth: 1, borderColor: 'rgba(185, 110, 255, 0.36)' },
+  songMenuCancelText: { color: '#E8D1FF', fontSize: 15, fontWeight: '700' },
+
 });

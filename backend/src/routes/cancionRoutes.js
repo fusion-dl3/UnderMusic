@@ -2,6 +2,8 @@ const express = require('express');
 
 const {
   publicarCancion,
+  editarCancion,
+  eliminarCancion,
   subirPortadaCancion,
   obtenerMisCanciones,
   obtenerCancionesArtista,
@@ -77,6 +79,9 @@ router.get(
   verificarToken,
   obtenerLanzamientosRecientes
 );
+
+router.patch('/:cancionId', verificarToken, editarCancion);
+router.delete('/:cancionId', verificarToken, eliminarCancion);
 
 router.get(
   '/:cancionId',
