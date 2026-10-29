@@ -278,9 +278,10 @@ player.seekTo(posicionSegura);
   };
 
   const cerrarReproductor = () => {
+    // Detiene la reproducción sin pasar null a AudioPlayer.replace.
     player.pause();
-    player.seekTo(0);
-
+    void player.seekTo(0);
+    reiniciarCicloEscucha('');
     setCancionActual(null);
     setCola([]);
   };

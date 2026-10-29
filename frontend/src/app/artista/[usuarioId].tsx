@@ -203,9 +203,18 @@ return {
 
     const [abriendoReproductor, setAbriendoReproductor] =
   useState(false);
+  const navegacionReproductorBloqueada = useRef(false);
+
+  const abrirReproductor = () => {
+    if (navegacionReproductorBloqueada.current) return;
+    navegacionReproductorBloqueada.current = true;
+    setAbriendoReproductor(true);
+    router.push('/reproductor');
+  };
 
   useFocusEffect(
   useCallback(() => {
+    navegacionReproductorBloqueada.current = false;
     setAbriendoReproductor(false);
   }, [])
 );
@@ -623,14 +632,12 @@ const mensaje = `🎵 ¡Escucha "${cancion.titulo}" de ${nombreArtista} en Under
       return;
     }
 
-   setAbriendoReproductor(true);
-
-reproducirCancion(
+   reproducirCancion(
   cancionParaReproductor,
   colaReproductor
 );
 
-router.push('/reproductor');
+abrirReproductor();
 
   };
 
@@ -1067,7 +1074,7 @@ router.push('/reproductor');
   ]}
   onPress={() => {
     if (!esVistaPrevia && cancionActual?.id === cancion.id) {
-      router.push('/reproductor');
+      abrirReproductor();
     }
   }}
 >

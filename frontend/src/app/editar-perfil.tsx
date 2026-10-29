@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
 import {
   File,
   UploadType,
 } from 'expo-file-system';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -198,6 +198,34 @@ const seleccionarFotoPerfil = async () => {
     mostrarUbicacion,
   ]);
 
+  const [salidaAutorizada, setSalidaAutorizada] = useState(false);
+  const [salidaPendiente, setSalidaPendiente] = useState(false);
+  const accionPendiente = useRef<any>(null);
+  const navegacion = useNavigation();
+  // Intercepta la salida sin importar el origen de la acción de navegación.
+  // La suscripción se desactiva después de que el usuario confirma el descarte.
+  useEffect(() => {
+    if (!hayCambios || salidaAutorizada) return;
+    const desuscribir = navegacion.addListener('beforeRemove', (evento: any) => {
+      if (guardando) {
+        evento.preventDefault();
+        return;
+      }
+      evento.preventDefault();
+      accionPendiente.current = evento.data.action;
+      setModalSalirVisible(true);
+    });
+    return desuscribir;
+  }, [navegacion, hayCambios, salidaAutorizada, guardando]);
+  useEffect(() => {
+    if (!salidaAutorizada || !salidaPendiente) return;
+    setSalidaPendiente(false);
+    const accion = accionPendiente.current;
+    accionPendiente.current = null;
+    if (accion) navegacion.dispatch(accion);
+    else router.back();
+  }, [salidaAutorizada, salidaPendiente, navegacion]);
+
 const intentarSalir = () => {
   if (!hayCambios) {
     router.back();
@@ -213,7 +241,8 @@ const seguirEditando = () => {
 
 const descartarCambios = () => {
   setModalSalirVisible(false);
-  router.back();
+  setSalidaAutorizada(true);
+  setSalidaPendiente(true);
 };
 
 
@@ -330,7 +359,8 @@ const descartarCambios = () => {
       }
     }
 
-    router.back();
+    setSalidaAutorizada(true);
+    setSalidaPendiente(true);
   } catch (error) {
     console.error('Error al guardar perfil:', error);
 

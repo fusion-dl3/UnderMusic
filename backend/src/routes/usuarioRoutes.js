@@ -5,7 +5,9 @@ const {
   iniciarSesion,
   obtenerUsuarioActual,
   actualizarPreferenciasMusicales,
-  actualizarPerfilUsuario
+  actualizarPerfilUsuario,
+  cambiarCorreoCuenta,
+  cambiarPasswordCuenta
 } = require('../controllers/usuarioController');
 
 const {
@@ -55,5 +57,8 @@ router.get(
   '/foto-perfil/:fotoId',
   obtenerFotoPerfil
 );
+
+router.patch('/me/correo', verificarToken, cambiarCorreoCuenta);
+router.patch('/me/password', verificarToken, cambiarPasswordCuenta);
 
 module.exports = router;

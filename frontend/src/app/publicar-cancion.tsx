@@ -1,16 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
   File,
   UploadType,
 } from 'expo-file-system';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -70,6 +72,43 @@ export default function PublicarCancionScreen() {
 
   const [publicando, setPublicando] = useState(false);
   const [error, setError] = useState('');
+
+  const [modalSalirVisible, setModalSalirVisible] = useState(false);
+  const [salidaAutorizada, setSalidaAutorizada] = useState(false);
+  const [salidaPendiente, setSalidaPendiente] = useState(false);
+  const accionPendiente = useRef<any>(null);
+  const navegacion = useNavigation();
+  const hayCambios = titulo.length > 0 || album.length > 0 || generoPrincipal !== null ||
+    generosSecundarios.length > 0 || archivoMp3 !== null || archivoPortada !== null;
+  // Intercepta la salida sin importar el origen de la acción de navegación.
+  // La suscripción se desactiva después de que el usuario confirma el descarte.
+  useEffect(() => {
+    if (!hayCambios || salidaAutorizada) return;
+    const desuscribir = navegacion.addListener('beforeRemove', (evento: any) => {
+      if (publicando) {
+        evento.preventDefault();
+        return;
+      }
+      evento.preventDefault();
+      accionPendiente.current = evento.data.action;
+      setModalSalirVisible(true);
+    });
+    return desuscribir;
+  }, [navegacion, hayCambios, salidaAutorizada, publicando]);
+  useEffect(() => {
+    if (!salidaAutorizada || !salidaPendiente) return;
+    setSalidaPendiente(false);
+    const accion = accionPendiente.current;
+    accionPendiente.current = null;
+    if (accion) navegacion.dispatch(accion);
+    else router.back();
+  }, [salidaAutorizada, salidaPendiente, navegacion]);
+  const confirmarSalida = () => {
+    setModalSalirVisible(false);
+    setSalidaAutorizada(true);
+    setSalidaPendiente(true);
+  };
+  const salir = () => { if (!publicando) router.back(); };
 
   const formularioValido = useMemo(() => {
     return (
@@ -472,7 +511,8 @@ export default function PublicarCancionScreen() {
        * MP3 y portada terminaron
        * correctamente.
        */
-      router.back();
+      setSalidaAutorizada(true);
+      setSalidaPendiente(true);
     } catch (error) {
       console.error(
         'Error al publicar canción:',
@@ -489,10 +529,10 @@ export default function PublicarCancionScreen() {
 
   return (
     <SafeAreaView style={styles.contenedor}>
-      <View style={styles.encabezado}>
+      <LinearGradient colors={['#281045', '#130B25', '#090713']} style={styles.encabezado}>
         <Pressable
           style={styles.botonVolver}
-          onPress={() => router.back()}
+          onPress={salir}
           disabled={publicando}
         >
           <Ionicons
@@ -507,7 +547,7 @@ export default function PublicarCancionScreen() {
         </Text>
 
         <View style={styles.espacioEncabezado} />
-      </View>
+      </LinearGradient>
 
       <ScrollView
         contentContainerStyle={styles.contenido}
@@ -632,6 +672,7 @@ export default function PublicarCancionScreen() {
 
         <View style={styles.separador} />
 
+        <Text style={styles.seccionTitulo}>ARCHIVOS DEL LANZAMIENTO</Text>
         <Text style={styles.etiqueta}>
           Archivo de audio
         </Text>
@@ -712,6 +753,7 @@ export default function PublicarCancionScreen() {
 
 {archivoPortada && (
   <View style={styles.archivoSeleccionado}>
+    <Image source={{ uri: archivoPortada.uri }} style={styles.portadaPreview} />
     <Ionicons
       name="checkmark-circle"
       size={22}
@@ -750,6 +792,7 @@ export default function PublicarCancionScreen() {
           onPress={publicarCancion}
           disabled={!formularioValido}
         >
+          <LinearGradient colors={formularioValido ? ['#9D46F5', '#7035C6', '#4E45BE'] : ['#473553', '#342940']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.botonGradiente}>
           {publicando ? (
             <>
               <ActivityIndicator
@@ -774,6 +817,7 @@ export default function PublicarCancionScreen() {
               </Text>
             </>
           )}
+          </LinearGradient>
         </Pressable>
       </ScrollView>
 
@@ -954,11 +998,39 @@ export default function PublicarCancionScreen() {
           </View>
         </View>
       </Modal>
+      <Modal visible={modalSalirVisible} transparent animationType="fade" onRequestClose={() => setModalSalirVisible(false)}>
+        <View style={styles.confirmacionFondo}>
+          <View style={styles.confirmacionTarjeta}>
+            <Ionicons name="warning-outline" size={34} color="#FF93B0" />
+            <Text style={styles.confirmacionTitulo}>¿Descartar publicación?</Text>
+            <Text style={styles.confirmacionMensaje}>Has ingresado información sin publicar. Si sales, perderás los datos y archivos seleccionados.</Text>
+            <View style={styles.confirmacionAcciones}>
+              <Pressable style={styles.confirmacionSecundario} onPress={() => setModalSalirVisible(false)}>
+                <Text style={styles.confirmacionBotonTexto}>Seguir editando</Text>
+              </Pressable>
+              <Pressable style={styles.confirmacionPeligro} onPress={confirmarSalida}>
+                <Text style={styles.confirmacionBotonTexto}>Descartar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  confirmacionFondo: { flex: 1, backgroundColor: 'rgba(0,0,0,0.78)', justifyContent: 'center', paddingHorizontal: 24 },
+  confirmacionTarjeta: { width: '100%', maxWidth: 420, alignSelf: 'center', backgroundColor: '#170D2C', borderRadius: 24, borderWidth: 1, borderColor: '#673A91', padding: 24, alignItems: 'center' },
+  confirmacionTitulo: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginTop: 12, textAlign: 'center' },
+  confirmacionMensaje: { color: '#CDBDDC', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 10, marginBottom: 24 },
+  confirmacionAcciones: { flexDirection: 'row', gap: 10, width: '100%' },
+  confirmacionSecundario: { flex: 1, minHeight: 48, borderRadius: 13, backgroundColor: '#37244E', alignItems: 'center', justifyContent: 'center' },
+  confirmacionPeligro: { flex: 1, minHeight: 48, borderRadius: 13, backgroundColor: '#AC3268', alignItems: 'center', justifyContent: 'center' },
+  confirmacionBotonTexto: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  seccionTitulo: { color: '#CB8CFF', fontSize: 12, letterSpacing: 1.5, fontWeight: '800', marginTop: 15 },
+  portadaPreview: { width: 58, height: 58, borderRadius: 12 },
+  botonGradiente: { width: '100%', minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   contenedor: {
     flex: 1,
     backgroundColor: '#090713',
@@ -969,7 +1041,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 18,
-    paddingVertical: 14,
+    paddingVertical: 17,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(186,100,255,0.22)',
   },
 
   botonVolver: {
@@ -981,8 +1054,8 @@ const styles = StyleSheet.create({
 
   tituloPantalla: {
     color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
   },
 
   espacioEncabezado: {
@@ -991,7 +1064,8 @@ const styles = StyleSheet.create({
 
   contenido: {
     paddingHorizontal: 22,
-    paddingTop: 16,
+    paddingTop: 18,
+    maxWidth: 700, width: '100%', alignSelf: 'center',
     paddingBottom: 44,
   },
 
@@ -1003,7 +1077,7 @@ const styles = StyleSheet.create({
   },
 
   descripcionCampo: {
-    color: '#817A8E',
+    color: '#B3A4C7',
     fontSize: 13,
     marginTop: 4,
     marginBottom: 9,
@@ -1014,9 +1088,9 @@ const styles = StyleSheet.create({
     marginTop: 9,
     paddingHorizontal: 15,
     borderWidth: 1,
-    borderColor: '#31263F',
+    borderColor: '#70419D',
     borderRadius: 14,
-    backgroundColor: '#151020',
+    backgroundColor: '#1A102C',
     color: '#FFFFFF',
     fontSize: 15,
   },
@@ -1026,9 +1100,9 @@ const styles = StyleSheet.create({
     marginTop: 9,
     paddingHorizontal: 15,
     borderWidth: 1,
-    borderColor: '#31263F',
+    borderColor: '#70419D',
     borderRadius: 14,
-    backgroundColor: '#151020',
+    backgroundColor: '#1A102C',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1041,7 +1115,7 @@ const styles = StyleSheet.create({
   },
 
   selectorPlaceholder: {
-    color: '#716B7D',
+    color: '#A08BAF',
   },
 
   chips: {
@@ -1055,9 +1129,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: '#29163C',
+    backgroundColor: '#3A2059',
     borderWidth: 1,
-    borderColor: '#6D3A93',
+    borderColor: '#A15DE0',
   },
 
   chipTexto: {
@@ -1083,13 +1157,13 @@ const styles = StyleSheet.create({
   selectorArchivo: {
     minHeight: 128,
     borderWidth: 1,
-    borderColor: '#5C367D',
+    borderColor: '#AD68E8',
     borderStyle: 'dashed',
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#151020',
+    backgroundColor: '#1A102C',
   },
 
   textoSelector: {
@@ -1105,7 +1179,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: '#171122',
+    backgroundColor: '#251536',
   },
 
   datosArchivo: {
@@ -1135,11 +1209,12 @@ const styles = StyleSheet.create({
     minHeight: 54,
     marginTop: 26,
     borderRadius: 16,
-    backgroundColor: '#7B3FC6',
+    backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 9,
+    overflow: 'hidden', borderWidth: 1, borderColor: '#C178FF',
   },
 
   botonPublicarDeshabilitado: {
@@ -1198,7 +1273,7 @@ const styles = StyleSheet.create({
   },
 
   opcionGeneroSeleccionada: {
-    backgroundColor: '#29163C',
+    backgroundColor: '#3A2059',
   },
 
   opcionGeneroDeshabilitada: {
@@ -1216,7 +1291,7 @@ const styles = StyleSheet.create({
   },
 
   opcionGeneroTextoDeshabilitado: {
-    color: '#817A8E',
+    color: '#B3A4C7',
   },
 
   botonListo: {

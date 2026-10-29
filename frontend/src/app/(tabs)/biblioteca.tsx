@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { CancionReproductor, usePlayer } from '@/context/PlayerContext';
 import {
   ActivityIndicator,
@@ -76,6 +76,21 @@ export default function BibliotecaScreen() {
   const [quitandoGuardada, setQuitandoGuardada] = useState<string | null>(null);
   const [imagenesConError, setImagenesConError] = useState<string[]>([]);
   const { cancionActual, reproduciendo, reproducirCancion, alternarReproduccion } = usePlayer();
+  const navegacionReproductorBloqueada = useRef(false);
+
+  // Impide apilar pantallas del reproductor al tocar rápidamente una tarjeta.
+  const abrirReproductor = () => {
+    if (navegacionReproductorBloqueada.current) return;
+    navegacionReproductorBloqueada.current = true;
+    router.push('/reproductor');
+  };
+
+  // Restablece el acceso cada vez que Biblioteca vuelve a estar enfocada.
+  useFocusEffect(
+    useCallback(() => {
+      navegacionReproductorBloqueada.current = false;
+    }, [])
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -318,7 +333,7 @@ export default function BibliotecaScreen() {
     const seleccionada = cola.find(c => c.id === cancion.id);
     if (!seleccionada) return;
     reproducirCancion(seleccionada, cola);
-    router.push('/reproductor');
+    abrirReproductor();
   };
 
   // Inicia un recorrido nuevo y completo de la colección seleccionada.
@@ -348,7 +363,7 @@ export default function BibliotecaScreen() {
     }
 
     reproducirCancion(lista[0], lista, true);
-    router.push('/reproductor');
+    abrirReproductor();
   };
 
   const renderizarControlesColeccion = (tipo: 'gustas' | 'guardadas') => {
@@ -444,7 +459,7 @@ export default function BibliotecaScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Abrir reproductor de ${cancion.titulo} si está seleccionada`}
             onPress={() => {
-              if (cancionActual?.id === cancion.id) router.push('/reproductor');
+              if (cancionActual?.id === cancion.id) abrirReproductor();
             }}
             style={({ pressed }) => [styles.tarjetaFavorita, pressed && styles.presionado]}
           >
@@ -552,7 +567,7 @@ export default function BibliotecaScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Abrir reproductor de ${cancion.titulo} si está seleccionada`}
             onPress={() => {
-              if (cancionActual?.id === cancion.id) router.push('/reproductor');
+              if (cancionActual?.id === cancion.id) abrirReproductor();
             }}
             style={({ pressed }) => [styles.tarjetaGuardada, pressed && styles.presionado]}
           >

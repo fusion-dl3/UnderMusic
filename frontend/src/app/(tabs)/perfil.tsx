@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -77,61 +76,6 @@ type EstadisticasArtista = {
 
 export default function PerfilScreen() {
   const { width: anchoPantalla } = useWindowDimensions();
-  // Un solo reflejo blanco que avanza por el contorno (4 tramos).
-  // Animamos traslaciones reales, no una línea simétrica que parece inmóvil.
-  const avanceBorde = useRef(new Animated.Value(0)).current;
-  const [cicloDestello, setCicloDestello] = useState(0);
-  useFocusEffect(useCallback(() => {
-    avanceBorde.stopAnimation();
-    avanceBorde.setValue(0);
-    setCicloDestello(actual => actual + 1);
-    const animacion = Animated.loop(
-      Animated.timing(avanceBorde, {
-        toValue: 4,
-        duration: 8500,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    animacion.start();
-    return () => { animacion.stop(); avanceBorde.stopAnimation(); };
-  }, [avanceBorde]));
-  const posicionDestello = (lado: number) => {
-    const recorrido = 138;
-    const rangosOpacidad = lado === 0
-      ? [0, 0.02, 0.98, 1, 4]
-      : [0, lado, lado + 0.02, lado + 0.98, lado + 1, 4].filter((v, i, a) => i === 0 || v !== a[i - 1]);
-    const valoresOpacidad = lado === 0
-  ? [0, 1, 1, 0, 0, 0]
-  : [0, 0, 1, 1, 0, 0];
-
-const valoresOpacidadAjustados = rangosOpacidad.map(
-  (_, indice) => valoresOpacidad[
-    Math.min(indice, valoresOpacidad.length - 1)
-  ]
-);
-
-return {
-  opacity: avanceBorde.interpolate({
-    inputRange: rangosOpacidad,
-    outputRange: valoresOpacidadAjustados,
-    extrapolate: 'clamp',
-  }),
-      transform: [
-        { translateX: avanceBorde.interpolate({
-          inputRange: [0, 1, 2, 3, 4],
-          outputRange: lado === 0 ? [0, recorrido, recorrido, recorrido, recorrido]
-            : lado === 2 ? [0, 0, 0, -recorrido, -recorrido] : [0, 0, 0, 0, 0],
-        }) },
-        { translateY: avanceBorde.interpolate({
-          inputRange: [0, 1, 2, 3, 4],
-          outputRange: lado === 1 ? [0, 0, recorrido, recorrido, recorrido]
-            : lado === 3 ? [0, 0, 0, 0, -recorrido] : [0, 0, 0, 0, 0],
-        }) },
-      ],
-    };
-  };
-
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const {
   cancionActual,
@@ -154,25 +98,36 @@ return {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [cancionMenu, setCancionMenu] = useState<Cancion | null>(null);
+  const [cancionParaEliminar, setCancionParaEliminar] = useState<Cancion | null>(null);
+  const [eliminandoCancion, setEliminandoCancion] = useState(false);
+  const [avisoCancion, setAvisoCancion] = useState<{ titulo: string; mensaje: string } | null>(null);
   const confirmarEliminarCancion = (cancion: Cancion) => {
-    Alert.alert('Eliminar canción', `¿Eliminar definitivamente «${cancion.titulo}»? Esta acción no se puede deshacer.`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: async () => {
-        try {
-          const token = await SecureStore.getItemAsync('token');
-          if (!token) { Alert.alert('Sesión', 'Debes iniciar sesión.'); return; }
-          const respuesta = await fetch(`http://192.168.1.5:3000/api/canciones/${cancion.id}`, {
-            method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
-          });
-          const datos = await respuesta.json();
-          if (!respuesta.ok) throw new Error(datos.message || 'No fue posible eliminar la canción.');
-          setCanciones(actuales => actuales.filter(item => item.id !== cancion.id));
-          await cargarPerfil();
-        } catch (error) {
-          Alert.alert('Error', error instanceof Error ? error.message : 'No fue posible eliminar la canción.');
-        }
-      } },
-    ]);
+    setCancionMenu(null);
+    setCancionParaEliminar(cancion);
+  };
+
+  const eliminarCancion = async () => {
+    if (!cancionParaEliminar || eliminandoCancion) return;
+    const cancion = cancionParaEliminar;
+    setEliminandoCancion(true);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) throw new Error('Debes iniciar sesión.');
+      const respuesta = await fetch(`http://192.168.1.5:3000/api/canciones/${cancion.id}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.message || 'No fue posible eliminar la canción.');
+      setCanciones(actuales => actuales.filter(item => item.id !== cancion.id));
+      setCancionParaEliminar(null);
+      setAvisoCancion({ titulo: 'Canción eliminada', mensaje: `«${cancion.titulo}» se eliminó correctamente.` });
+      await cargarPerfil();
+    } catch (error) {
+      setCancionParaEliminar(null);
+      setAvisoCancion({ titulo: 'No se pudo eliminar', mensaje: error instanceof Error ? error.message : 'No fue posible eliminar la canción.' });
+    } finally {
+      setEliminandoCancion(false);
+    }
   };
 
   const mostrarOpcionesCancion = (cancion: Cancion) => {
@@ -432,6 +387,9 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
               </Pressable>
 
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Configuración de cuenta"
+                onPress={() => router.push('/configuracion-cuenta')}
                 style={({ pressed }) => [
                   styles.headerButton,
                   pressed && styles.buttonPressed,
@@ -449,7 +407,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
           <View style={styles.profileSection}>
             <View style={styles.avatarGlowContainer}>
             <View style={styles.avatarBorder}>
-                              <View style={styles.avatar}>
+<View style={styles.avatar}>
                 {usuario.fotoPerfil ? (
                   <Image
                     source={{
@@ -466,18 +424,6 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                   />
                 )}
               </View>
-                <Animated.View key={`destello-${cicloDestello}-0`} pointerEvents="none" style={[styles.avatarGlintHorizontal, { top: 0, left: 0 }, posicionDestello(0)]}>
-                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0,y:0.5}} end={{x:1,y:0.5}} />
-                </Animated.View>
-                <Animated.View key={`destello-${cicloDestello}-1`} pointerEvents="none" style={[styles.avatarGlintVertical, { top: 0, right: 0 }, posicionDestello(1)]}>
-                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0.5,y:0}} end={{x:0.5,y:1}} />
-                </Animated.View>
-                <Animated.View key={`destello-${cicloDestello}-2`} pointerEvents="none" style={[styles.avatarGlintHorizontal, { bottom: 0, right: 0 }, posicionDestello(2)]}>
-                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0,y:0.5}} end={{x:1,y:0.5}} />
-                </Animated.View>
-                <Animated.View key={`destello-${cicloDestello}-3`} pointerEvents="none" style={[styles.avatarGlintVertical, { bottom: 0, left: 0 }, posicionDestello(3)]}>
-                  <LinearGradient colors={['transparent', 'rgba(255,255,255,0.35)', '#FFFFFF', 'rgba(255,255,255,0.35)', 'transparent']} style={StyleSheet.absoluteFill} start={{x:0.5,y:0}} end={{x:0.5,y:1}} />
-                </Animated.View>
             </View>
             </View>
 
@@ -1105,6 +1051,29 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
             </View>
           </View>
         </Modal>
+        <Modal visible={cancionParaEliminar !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { if (!eliminandoCancion) setCancionParaEliminar(null); }}>
+          <View style={styles.umDialogOverlay}>
+            <View style={styles.umDialogPanel}>
+              <Ionicons name="trash-outline" size={34} color="#FF83B3" />
+              <Text style={styles.umDialogTitle}>Eliminar canción</Text>
+              <Text style={styles.umDialogMessage}>¿Eliminar definitivamente «{cancionParaEliminar?.titulo}»? Esta acción no se puede deshacer.</Text>
+              <View style={styles.umDialogActions}>
+                <Pressable disabled={eliminandoCancion} style={styles.umDialogSecondary} onPress={() => setCancionParaEliminar(null)}><Text style={styles.umDialogButtonText}>Cancelar</Text></Pressable>
+                <Pressable disabled={eliminandoCancion} style={[styles.umDialogDanger, eliminandoCancion && { opacity: 0.6 }]} onPress={() => void eliminarCancion()}>
+                  {eliminandoCancion ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.umDialogButtonText}>Eliminar</Text>}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <Modal visible={avisoCancion !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAvisoCancion(null)}>
+          <View style={styles.umDialogOverlay}><View style={styles.umDialogPanel}>
+            <Ionicons name={avisoCancion?.titulo === 'Canción eliminada' ? 'checkmark-circle-outline' : 'alert-circle-outline'} size={36} color="#C58BFF" />
+            <Text style={styles.umDialogTitle}>{avisoCancion?.titulo}</Text>
+            <Text style={styles.umDialogMessage}>{avisoCancion?.mensaje}</Text>
+            <Pressable style={styles.umDialogPrimary} onPress={() => setAvisoCancion(null)}><Text style={styles.umDialogButtonText}>Aceptar</Text></Pressable>
+          </View></View>
+        </Modal>
       </SafeAreaView>
     </ImageBackground>
   );
@@ -1232,8 +1201,6 @@ const styles = StyleSheet.create({
   },
 
   avatarGlowContainer: { width: 174, height: 174, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
-  avatarGlintHorizontal: { position: 'absolute', width: 32, height: 4, borderRadius: 2, zIndex: 2 },
-  avatarGlintVertical: { position: 'absolute', width: 4, height: 32, borderRadius: 2, zIndex: 2 },
   avatarBorder: {
     overflow: 'hidden',
     width: 170,
@@ -1918,6 +1885,16 @@ publishSongButtonText: {
     textAlign: 'center',
     marginTop: 12,
   },
+
+  umDialogOverlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: 'rgba(3,1,15,0.82)' },
+  umDialogPanel: { width: '100%', maxWidth: 420, alignSelf: 'center', alignItems: 'center', borderRadius: 24, borderWidth: 1, borderColor: '#9251D4', backgroundColor: '#170D2C', padding: 24 },
+  umDialogTitle: { color: '#FFFFFF', fontSize: 21, fontWeight: '800', marginTop: 12, textAlign: 'center' },
+  umDialogMessage: { color: '#D1BEDF', fontSize: 15, lineHeight: 23, marginTop: 10, marginBottom: 22, textAlign: 'center' },
+  umDialogActions: { flexDirection: 'row', gap: 10, width: '100%' },
+  umDialogSecondary: { flex: 1, borderRadius: 14, backgroundColor: '#38234F', alignItems: 'center', justifyContent: 'center', minHeight: 49 },
+  umDialogDanger: { flex: 1, borderRadius: 14, backgroundColor: '#AD3167', alignItems: 'center', justifyContent: 'center', minHeight: 49 },
+  umDialogPrimary: { width: '100%', borderRadius: 14, backgroundColor: '#793ACB', alignItems: 'center', justifyContent: 'center', minHeight: 49 },
+  umDialogButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   songMenuOverlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: 'rgba(3, 1, 15, 0.76)' },
   songMenuPanel: { width: '100%', maxWidth: 420, alignSelf: 'center', overflow: 'hidden', borderRadius: 24, backgroundColor: '#150A2D', borderWidth: 1, borderColor: 'rgba(174, 89, 255, 0.65)', paddingHorizontal: 20, paddingTop: 23, paddingBottom: 16 },
   songMenuAccent: { position: 'absolute', top: 0, left: 30, right: 30, height: 2, backgroundColor: '#AD58F6' },

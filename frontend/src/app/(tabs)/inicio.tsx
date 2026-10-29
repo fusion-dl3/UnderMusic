@@ -195,6 +195,8 @@ export default function InicioScreen() {
   // Permite abrir Lanzamientos recientes directamente desde Biblioteca.
   const { seccion, solicitud } = useLocalSearchParams<{ seccion?: string; solicitud?: string }>();
   const scrollPrincipalRef = useRef<ScrollView>(null);
+  // Impide apilar pantallas del reproductor ante pulsaciones rápidas.
+  const navegacionReproductorEnCursoRef = useRef(false);
   const posicionLanzamientosRef = useRef<number | null>(null);
   const solicitudPendienteRef = useRef<string | null>(null);
   const ultimaSolicitudAtendidaRef = useRef<string | null>(null);
@@ -217,6 +219,19 @@ export default function InicioScreen() {
       }
     }, [seccion, solicitud, desplazarALanzamientos])
   );
+
+  useFocusEffect(
+    useCallback(() => {
+      navegacionReproductorEnCursoRef.current = false;
+    }, [])
+  );
+
+  const abrirReproductorUnaVez = useCallback(() => {
+    if (navegacionReproductorEnCursoRef.current) return false;
+    navegacionReproductorEnCursoRef.current = true;
+    router.push('/reproductor');
+    return true;
+  }, []);
 
   const [actualizando, setActualizando] = useState(false);
   const [cancionesRecientes, setCancionesRecientes] = useState<CancionReciente[]>([]);
@@ -471,8 +486,9 @@ export default function InicioScreen() {
   };
 
   const abrirReciente = (cancion: CancionReciente) => {
+    if (navegacionReproductorEnCursoRef.current) return;
     if (cancionActual?.id !== cancion.id) iniciarReciente(cancion);
-    router.push('/reproductor');
+    abrirReproductorUnaVez();
   };
 
   const pulsarPlayReciente = (cancion: CancionReciente) => {
@@ -499,8 +515,9 @@ export default function InicioScreen() {
   };
 
   const abrirLanzamiento = (cancion: CancionLanzamiento) => {
+    if (navegacionReproductorEnCursoRef.current) return;
     if (cancionActual?.id !== cancion.id) iniciarLanzamiento(cancion);
-    router.push('/reproductor');
+    abrirReproductorUnaVez();
   };
 
   const pulsarPlayLanzamiento = (cancion: CancionLanzamiento) => {

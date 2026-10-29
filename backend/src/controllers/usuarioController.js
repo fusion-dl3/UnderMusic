@@ -561,10 +561,73 @@ if (
   }
 }
 
+
+// Cambios de credenciales de la cuenta (beta: sin verificación de correo).
+async function cambiarCorreoCuenta(req, res) {
+  try {
+    const { correoCuenta, passwordActual } = req.body || {};
+    if (typeof correoCuenta !== 'string' || typeof passwordActual !== 'string' || !passwordActual) {
+      return res.status(400).json({ message: 'Nuevo correo y contraseña actual son obligatorios' });
+    }
+    const correoNormalizado = normalizarCorreo(correoCuenta);
+    if (!esCorreoValido(correoNormalizado)) {
+      return res.status(400).json({ message: 'El correo electrónico no es válido' });
+    }
+    const usuarios = getUsuariosCollection();
+    const id = new ObjectId(req.usuario.id);
+    const usuario = await usuarios.findOne({ _id: id });
+    if (!usuario) return res.status(404).json({ message: 'Usuario no encontrado' });
+    if (!(await bcrypt.compare(passwordActual, usuario.passwordHash))) {
+      return res.status(401).json({ message: 'La contraseña actual es incorrecta' });
+    }
+    if (usuario.correoCuenta === correoNormalizado) {
+      return res.status(400).json({ message: 'El correo nuevo debe ser distinto al actual' });
+    }
+    const duplicado = await usuarios.findOne({ correoCuenta: correoNormalizado, _id: { $ne: id } });
+    if (duplicado) return res.status(409).json({ message: 'El correo electrónico ya está registrado' });
+    await usuarios.updateOne({ _id: id }, { $set: { correoCuenta: correoNormalizado, fechaActualizacion: new Date() } });
+    return res.status(200).json({ message: 'Correo actualizado correctamente', correoCuenta: correoNormalizado });
+  } catch (error) {
+    if (error && error.code === 11000) return res.status(409).json({ message: 'El correo electrónico ya está registrado' });
+    console.error('Error al cambiar correo:', error);
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  }
+}
+
+async function cambiarPasswordCuenta(req, res) {
+  try {
+    const { passwordActual, passwordNueva } = req.body || {};
+    if (typeof passwordActual !== 'string' || typeof passwordNueva !== 'string' || !passwordActual) {
+      return res.status(400).json({ message: 'Contraseña actual y nueva son obligatorias' });
+    }
+    if (passwordNueva.length < 6) {
+      return res.status(400).json({ message: 'La contraseña nueva debe tener al menos 6 caracteres' });
+    }
+    if (passwordActual === passwordNueva) {
+      return res.status(400).json({ message: 'La contraseña nueva debe ser distinta a la actual' });
+    }
+    const usuarios = getUsuariosCollection();
+    const id = new ObjectId(req.usuario.id);
+    const usuario = await usuarios.findOne({ _id: id });
+    if (!usuario) return res.status(404).json({ message: 'Usuario no encontrado' });
+    if (!(await bcrypt.compare(passwordActual, usuario.passwordHash))) {
+      return res.status(401).json({ message: 'La contraseña actual es incorrecta' });
+    }
+    const passwordHash = await bcrypt.hash(passwordNueva, 10);
+    await usuarios.updateOne({ _id: id }, { $set: { passwordHash, fechaActualizacion: new Date() } });
+    return res.status(200).json({ message: 'Contraseña actualizada correctamente' });
+  } catch (error) {
+    console.error('Error al cambiar contraseña:', error);
+    return res.status(500).json({ message: 'Error interno del servidor' });
+  }
+}
+
 module.exports = {
   registrarUsuario,
   iniciarSesion,
   obtenerUsuarioActual,
   actualizarPreferenciasMusicales,
-  actualizarPerfilUsuario
+  actualizarPerfilUsuario,
+  cambiarCorreoCuenta,
+  cambiarPasswordCuenta
 };
