@@ -1,6 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { useCallback, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -9,6 +13,7 @@ import {
 } from 'react-native';
 
 import { usePlayer } from '@/context/PlayerContext';
+import { avisarCambioBiblioteca } from '@/context/BibliotecaEventos';
 
 const API_URL = 'http://192.168.1.5:3000';
 
@@ -21,7 +26,65 @@ export function MiniPlayer() {
     reproducirAnterior,
     reproducirSiguiente,
     cerrarReproductor,
+    tieneAnterior,
+    tieneSiguiente,
+    abrirVentanaCola,
   } = usePlayer();
+
+  const cancionId = cancionActual?.id ?? null;
+  const [meGusta, setMeGusta] = useState(false);
+  const [guardada, setGuardada] = useState(false);
+  const [cargando, setCargando] = useState(true);
+  const [procesando, setProcesando] = useState<'me-gustas' | 'guardadas' | null>(null);
+  const bloqueo = useRef(false);
+
+  // Recargar al cambiar de canción y al volver desde el reproductor grande.
+  useFocusEffect(useCallback(() => {
+    let activo = true;
+    setMeGusta(false);
+    setGuardada(false);
+    setCargando(Boolean(cancionId));
+    if (cancionId) {
+      void (async () => {
+        try {
+          const token = await SecureStore.getItemAsync('token');
+          if (!token) return;
+          const headers = { Authorization: `Bearer ${token}` };
+          const [like, save] = await Promise.all([
+            fetch(`${API_URL}/api/me-gustas/${cancionId}/estado`, { headers }),
+            fetch(`${API_URL}/api/guardadas/${cancionId}/estado`, { headers }),
+          ]);
+          if (!like.ok || !save.ok) throw new Error('No se pudieron consultar las interacciones.');
+          const [l, g] = await Promise.all([like.json(), save.json()]);
+          if (activo) { setMeGusta(l.meGusta === true); setGuardada(g.guardada === true); }
+        } catch (error) { console.warn('MiniPlayer: error al cargar interacciones', error); }
+        finally { if (activo) setCargando(false); }
+      })();
+    }
+    return () => { activo = false; };
+  }, [cancionId]));
+
+  const alternarInteraccion = async (tipo: 'me-gustas' | 'guardadas') => {
+    if (!cancionId || cargando || bloqueo.current) return;
+    bloqueo.current = true;
+    setProcesando(tipo);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) { Alert.alert('Sesión', 'Inicia sesión para continuar.'); return; }
+      const activo = tipo === 'me-gustas' ? meGusta : guardada;
+      const respuesta = await fetch(`${API_URL}/api/${tipo}/${cancionId}`, {
+        method: activo ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.message || 'No se pudo actualizar la canción.');
+      if (tipo === 'me-gustas') setMeGusta(datos.meGusta === true);
+      else setGuardada(datos.guardada === true);
+      avisarCambioBiblioteca(tipo, cancionId);
+    } catch (error) {
+      Alert.alert('UnderMusic', error instanceof Error ? error.message : 'Error de conexión.');
+    } finally { bloqueo.current = false; setProcesando(null); }
+  };
 
   if (!cancionActual) {
     return null;
@@ -75,6 +138,38 @@ export function MiniPlayer() {
           </Text>
         </View>
 
+      <View style={styles.actionsRow}>
+        <Pressable
+          style={[styles.actionButton, styles.queueButton]}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir cola de reproducción"
+          onPress={(event) => { event.stopPropagation(); abrirVentanaCola(); }}
+        >
+          <Ionicons name="list-outline" size={19} color="#FFC477" />
+        </Pressable>
+        <Pressable
+          style={[styles.actionButton, styles.saveButton]}
+          accessibilityRole="button"
+          accessibilityLabel={guardada ? 'Quitar de Guardadas' : 'Guardar canción'}
+          disabled={cargando || procesando !== null}
+          onPress={(event) => { event.stopPropagation(); void alternarInteraccion('guardadas'); }}
+        >
+          {procesando === 'guardadas' ? <ActivityIndicator size="small" color="#54E6FF" /> :
+            <Ionicons name={guardada ? 'bookmark' : 'bookmark-outline'} size={19} color={guardada ? '#54E6FF' : '#9FD9E5'} />}
+        </Pressable>
+        <Pressable
+          style={[styles.actionButton, styles.likeButton]}
+          accessibilityRole="button"
+          accessibilityLabel={meGusta ? 'Quitar Me gusta' : 'Dar Me gusta'}
+          disabled={cargando || procesando !== null}
+          onPress={(event) => { event.stopPropagation(); void alternarInteraccion('me-gustas'); }}
+        >
+          {procesando === 'me-gustas' ? <ActivityIndicator size="small" color="#FF68B7" /> :
+            <Ionicons name={meGusta ? 'heart' : 'heart-outline'} size={20} color={meGusta ? '#FF68B7' : '#E7A1C8'} />}
+        </Pressable>
+      </View>
+
+        <View style={{ flex: 1 }} pointerEvents="none" />
         <View style={styles.controls}>
           <Pressable
             style={styles.secondaryButton}
@@ -83,6 +178,7 @@ export function MiniPlayer() {
               reproducirAnterior();
             }}
             hitSlop={4}
+            disabled={!tieneAnterior}
           >
             <Ionicons
               name="play-skip-back"
@@ -116,6 +212,7 @@ export function MiniPlayer() {
               reproducirSiguiente();
             }}
             hitSlop={4}
+            disabled={!tieneSiguiente}
           >
             <Ionicons
               name="play-skip-forward"
@@ -196,6 +293,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 10,
     marginRight: 6,
+    maxWidth: '30%',
   },
 
   title: {
@@ -244,6 +342,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginRight: 0,
+    flexShrink: 0,
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    transform: [{ translateX: -62 }, { translateY: -8 }],
+    zIndex: 2,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 18,
+  },
+  queueButton: { backgroundColor: 'rgba(183,109,28,0.18)', borderColor: 'rgba(232,166,75,0.65)' },
+  saveButton: { backgroundColor: 'rgba(48,129,150,0.16)', borderColor: 'rgba(100,191,215,0.48)' },
+  likeButton: { backgroundColor: 'rgba(165,58,112,0.16)', borderColor: 'rgba(225,124,177,0.48)' },
   progressTrack: {
     width: '100%',
     height: 3,

@@ -146,6 +146,10 @@ return {
   }, []);
 
   const mostrarAvisoSeguimiento = (nuevoEstado: boolean) => {
+    // Una sola notificación visible: el último evento reemplaza al anterior.
+    if (temporizadorCola.current) clearTimeout(temporizadorCola.current);
+    temporizadorCola.current = null;
+    setAvisoCola(null);
     if (temporizadorAviso.current) clearTimeout(temporizadorAviso.current);
     setAvisoSeguimiento({
       mensaje: `${nuevoEstado ? 'Comenzaste a seguir a' : 'Dejaste de seguir a'} ${artista?.nombreArtistico || 'este artista'}`,
@@ -166,8 +170,74 @@ return {
     cancionActual,
     reproduciendo,
     reproducirCancion,
+    agregarACola,
+    colaManual,
+    quitarDeCola,
     alternarReproduccion,
+    abrirVentanaCola,
   } = usePlayer();
+
+  const [avisoCola, setAvisoCola] = useState<{ titulo: string; indice: number; id: string } | null>(null);
+  const temporizadorCola = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (temporizadorCola.current) clearTimeout(temporizadorCola.current);
+  }, []);
+
+  const cerrarAvisoCola = () => {
+    if (temporizadorCola.current) clearTimeout(temporizadorCola.current);
+    temporizadorCola.current = null;
+    setAvisoCola(null);
+  };
+
+  const agregarCancionACola = (cancion: Cancion) => {
+    if (esVistaPrevia || !artista || !cancion.audioId) return;
+    const agregada = agregarACola({
+      id: cancion.id,
+      audioId: cancion.audioId,
+      titulo: cancion.titulo,
+      nombreArtista: artista.nombreArtistico || artista.nombreUsuario,
+      usuarioId: artista.usuarioId,
+      portadaId: cancion.portadaId,
+      fotoArtista: artista.fotoPerfil || null,
+    });
+    if (!agregada) {
+      // Sin canción activa, esta canción inicia la reproducción y su lista automática.
+      // No se muestra el aviso de «Añadida a la cola» porque ya está sonando.
+      if (!cancionActual) {
+        const listaInicial = construirColaCircular(cancion);
+        const seleccionada = listaInicial[0];
+        if (seleccionada) {
+          cerrarAvisoCola();
+          reproducirCancion(seleccionada, listaInicial, true);
+          abrirReproductor();
+        }
+      }
+      return;
+    }
+    if (temporizadorAviso.current) clearTimeout(temporizadorAviso.current);
+    temporizadorAviso.current = null;
+    setAvisoSeguimiento(null);
+    if (temporizadorCola.current) clearTimeout(temporizadorCola.current);
+    setAvisoCola({ titulo: cancion.titulo, id: cancion.id, indice: colaManual.length });
+    temporizadorCola.current = setTimeout(() => {
+      setAvisoCola(null);
+      temporizadorCola.current = null;
+    }, 5000);
+  };
+
+  const deshacerUltimaAdicion = () => {
+    if (!avisoCola) return;
+    // Solo quitar la entrada concreta si sigue en la misma posición.
+    if (colaManual[avisoCola.indice]?.id === avisoCola.id) {
+      quitarDeCola(avisoCola.indice);
+    }
+    cerrarAvisoCola();
+  };
+
+  const abrirColaDesdeAviso = () => {
+    cerrarAvisoCola();
+    abrirVentanaCola();
+  };
 
   const [artista, setArtista] =
     useState<ArtistaPublico | null>(null);
@@ -340,6 +410,7 @@ return {
       if (!usuarioId || esVistaPrevia) return;
       void cargarMisMeGustas();
       void cargarMisGuardadas();
+      void refrescarCancionesCatalogo();
     }, [usuarioId, esVistaPrevia])
   );
 
@@ -432,6 +503,19 @@ return {
     }
   };
 
+  // Actualiza el ranking cuando el usuario regresa al perfil, sin recargar la pantalla.
+  const refrescarCancionesCatalogo = async () => {
+    if (!usuarioId) return;
+    try {
+      const respuesta = await fetch(`${API_URL}/api/canciones/artista/${usuarioId}`);
+      if (!respuesta.ok) return;
+      const datos = await respuesta.json();
+      if (Array.isArray(datos.canciones)) setCanciones(datos.canciones);
+    } catch (error) {
+      console.warn('No fue posible actualizar el catálogo:', error);
+    }
+  };
+
   const cargarPerfilPublico = async () => {
     try {
       setCargando(true);
@@ -506,7 +590,9 @@ return {
     .filter((cancion) => !idsTop3.has(cancion.id))
     .sort((a, b) => (b.reproducciones ?? 0) - (a.reproducciones ?? 0) ||
       new Date(b.fechaPublicacion).getTime() - new Date(a.fechaPublicacion).getTime());
-  const cancionesPorPopularidad = [...cancionesPopulares, ...restantesPorReproducciones];
+  const cancionesPorPopularidad = [...canciones].sort((a, b) =>
+    (b.reproducciones ?? 0) - (a.reproducciones ?? 0) ||
+    new Date(b.fechaPublicacion).getTime() - new Date(a.fechaPublicacion).getTime());
   const cancionesPorFecha = [...canciones].sort((a, b) =>
     new Date(b.fechaPublicacion).getTime() - new Date(a.fechaPublicacion).getTime());
   const cancionesVisibles = mostrarTodasCanciones
@@ -588,57 +674,33 @@ const mensaje = `🎵 ¡Escucha "${cancion.titulo}" de ${nombreArtista} en Under
     }
   };
 
-  const reproducir = (
-    cancion: Cancion
-  ) => {
-    if (esVistaPrevia || !cancion.audioId || !artista) {
-      return;
-    }
+  const construirColaCircular = (seleccionada: Cancion): CancionReproductor[] => {
+    if (!artista) return [];
+    const orden = mostrarTodasCanciones && ordenCanciones === 'recientes'
+      ? cancionesPorFecha
+      : cancionesPorPopularidad;
+    const disponibles = orden.filter((item): item is Cancion & {audioId: string} => Boolean(item.audioId));
+    const inicio = disponibles.findIndex(item => item.id === seleccionada.id);
+    if (inicio < 0) return [];
+    const recorrido = [...disponibles.slice(inicio), ...disponibles.slice(0, inicio)];
+    return recorrido.map(item => ({
+      id: item.id, audioId: item.audioId, titulo: item.titulo,
+      nombreArtista: artista.nombreArtistico || artista.nombreUsuario,
+      usuarioId: artista.usuarioId, portadaId: item.portadaId,
+      fotoArtista: artista.fotoPerfil || null,
+    }));
+  };
 
-    const esCancionActual =
-      cancionActual?.id === cancion.id;
-
-    if (esCancionActual) {
+  const reproducir = (cancion: Cancion) => {
+    if (esVistaPrevia || !cancion.audioId || !artista) return;
+    if (cancionActual?.id === cancion.id) {
       alternarReproduccion();
       return;
     }
-
-    const colaReproductor:
-      CancionReproductor[] = canciones
-        .filter(
-          (item) =>
-            item.audioId !== null
-        )
-        .map((item) => ({
-          id: item.id,
-          audioId: item.audioId as string,
-          titulo: item.titulo,
-          nombreArtista:
-            artista.nombreArtistico ||
-            artista.nombreUsuario,
-            usuarioId: artista.usuarioId,
-          portadaId: item.portadaId,
-          fotoArtista:
-            artista.fotoPerfil || null,
-        }));
-
-    const cancionParaReproductor =
-      colaReproductor.find(
-        (item) =>
-          item.id === cancion.id
-      );
-
-    if (!cancionParaReproductor) {
-      return;
-    }
-
-   reproducirCancion(
-  cancionParaReproductor,
-  colaReproductor
-);
-
-abrirReproductor();
-
+    const colaReproductor = construirColaCircular(cancion);
+    if (colaReproductor.length === 0) return;
+    reproducirCancion(colaReproductor[0], colaReproductor, true);
+    abrirReproductor();
   };
 
   if (cargando) {
@@ -1174,12 +1236,12 @@ abrirReproductor();
 
                         <Pressable
                            style={[styles.songQueueButton, anchoPantalla < 700 && styles.songActionCompact]}
-                           disabled
+                           disabled={esVistaPrevia || !cancion.audioId}
+                           onPress={() => agregarCancionACola(cancion)}
                            accessibilityRole="button"
-                           accessibilityState={{ disabled: true }}
-                           accessibilityLabel={`Añadir ${cancion.titulo} a la cola de reproducción (próximamente)`}
+                           accessibilityLabel={`Añadir ${cancion.titulo} a la cola de reproducción`}
                          >
-                           <Ionicons name="list-outline" size={22} color="#B7A6C7" />
+                           <Ionicons name="list-outline" size={22} color="#FFC477" />
                          </Pressable>
 
                          <Pressable
@@ -1396,8 +1458,27 @@ abrirReproductor();
            </View>
          </View>
        </Modal>
+       {avisoCola && !esVistaPrevia ? (
+         <View pointerEvents="box-none" style={[styles.toastLayer, { top: insets.top + (cancionActual && !abriendoReproductor ? 60 : 12) }]}>
+           <View style={styles.toastColaCard}>
+             <Pressable style={styles.toastColaMain} onPress={abrirColaDesdeAviso} accessibilityRole="button" accessibilityLabel="Abrir cola de reproducción">
+               <View style={styles.toastColaIcon}><Ionicons name="list" size={24} color="#FFC477" /></View>
+               <View style={{ flex: 1 }}>
+                 <Text style={styles.toastColaTitle}>Añadida a la cola</Text>
+                 <Text style={styles.toastColaText} numberOfLines={2}>«{avisoCola.titulo}» se añadió a la cola de reproducción.</Text>
+                 <Text style={styles.toastColaHint}>Toca para ver la cola</Text>
+               </View>
+               <Ionicons name="chevron-forward" size={18} color="#FFC477" />
+             </Pressable>
+             <Pressable onPress={deshacerUltimaAdicion} style={styles.toastColaUndo} accessibilityRole="button" accessibilityLabel={`Deshacer añadir ${avisoCola.titulo} a la cola`}>
+               <Ionicons name="arrow-undo-outline" size={16} color="#FFC477" />
+               <Text style={styles.toastColaUndoText}>Deshacer</Text>
+             </Pressable>
+           </View>
+         </View>
+       ) : null}
        {avisoSeguimiento ? (
-        <View pointerEvents="box-none" style={[styles.toastLayer, { top: insets.top + 12 }]}>
+        <View pointerEvents="box-none" style={[styles.toastLayer, { top: insets.top + (cancionActual && !abriendoReproductor ? 60 : 12) }]}>
           <View style={styles.toastCard}>
             <View style={styles.toastIcon}>
               <Ionicons
@@ -1550,6 +1631,19 @@ const styles = StyleSheet.create({
   },
   contactOptionTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
   contactOptionDetail: { color: '#CDB9D4', fontSize: 12, marginTop: 4 },
+  toastColaCard: {
+    width: '100%', maxWidth: 600, borderRadius: 20,
+    backgroundColor: '#211527', borderWidth: 1.5,
+    borderColor: 'rgba(232,166,75,0.65)', overflow: 'hidden',
+    elevation: 12,
+  },
+  toastColaMain: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  toastColaIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(183,109,28,0.18)', alignItems: 'center', justifyContent: 'center' },
+  toastColaTitle: { color: '#FFC477', fontSize: 13, fontWeight: '800' },
+  toastColaText: { color: '#FFFFFF', fontSize: 13, lineHeight: 18, marginTop: 2 },
+  toastColaHint: { color: '#BDAFCB', fontSize: 11, marginTop: 3 },
+  toastColaUndo: { borderTopWidth: 1, borderTopColor: 'rgba(232,166,75,0.2)', paddingVertical: 8, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 5 },
+  toastColaUndoText: { color: '#FFC477', fontSize: 12, fontWeight: '700' },
   toastLayer: {
     position: 'absolute',
     left: 16,
@@ -1934,7 +2028,7 @@ header: {
 
   songCardOuter: { width: '100%' },
   songCardCompact: { flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, paddingRight: 71 },
-  songActionsCompact: { width: '100%', justifyContent: 'space-between', marginRight: -84 },
+  songActionsCompact: { width: '100%', justifyContent: 'flex-start', gap: 8, marginRight: -84 },
   songActionCompact: { marginLeft: 0, marginRight: 0 },
   songMetricsDividerCompact: { position: 'absolute', right: 56, top: 17, height: 52, marginLeft: 0, marginRight: 0 },
   songMetricsColumnCompact: { position: 'absolute', right: 4, top: 15, width: 47 },
@@ -2029,14 +2123,14 @@ header: {
     borderColor: 'rgba(255, 104, 183, 0.45)',
   },
 
-  songQueueButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 7, backgroundColor: 'rgba(91, 80, 112, 0.13)', borderWidth: 1, borderColor: 'rgba(170, 151, 192, 0.32)', opacity: 0.55 },
+  songQueueButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 11, backgroundColor: 'rgba(183, 109, 28, 0.18)', borderWidth: 1, borderColor: 'rgba(232, 166, 75, 0.65)' },
   songSaveButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 13,
+    marginRight: 11,
     backgroundColor: 'rgba(24, 119, 143, 0.18)',
     borderWidth: 1,
     borderColor: 'rgba(84, 230, 255, 0.45)',
@@ -2048,7 +2142,7 @@ header: {
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 13,
+    marginRight: 11,
     backgroundColor: 'rgba(120, 66, 175, 0.18)',
     borderWidth: 1,
     borderColor: 'rgba(190, 129, 255, 0.45)',

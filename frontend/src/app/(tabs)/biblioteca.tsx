@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CancionReproductor, usePlayer } from '@/context/PlayerContext';
+import { escucharCambiosBiblioteca, avisarCambioBiblioteca } from '@/context/BibliotecaEventos';
 import {
   ActivityIndicator,
   Alert,
@@ -75,7 +76,49 @@ export default function BibliotecaScreen() {
   const [errorGuardadas, setErrorGuardadas] = useState('');
   const [quitandoGuardada, setQuitandoGuardada] = useState<string | null>(null);
   const [imagenesConError, setImagenesConError] = useState<string[]>([]);
-  const { cancionActual, reproduciendo, reproducirCancion, alternarReproduccion } = usePlayer();
+  const { cancionActual, reproduciendo, reproducirCancion, alternarReproduccion, agregarACola, colaManual, quitarDeCola } = usePlayer();
+  const [revisionBiblioteca, setRevisionBiblioteca] = useState(0);
+  const listasCargadas = useRef(false);
+  const [avisoCola, setAvisoCola] = useState<{ titulo: string; indice: number; id: string } | null>(null);
+  const temporizadorCola = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const colaRef = useRef(colaManual);
+  colaRef.current = colaManual;
+  useEffect(() => {
+    const cancelar = escucharCambiosBiblioteca(() => setRevisionBiblioteca(v => v + 1));
+    return () => { cancelar(); if (temporizadorCola.current) clearTimeout(temporizadorCola.current); };
+  }, []);
+  const cerrarAvisoCola = () => {
+    if (temporizadorCola.current) clearTimeout(temporizadorCola.current);
+    temporizadorCola.current = null;
+    setAvisoCola(null);
+  };
+  const convertirCancion = (c: CancionFavorita): CancionReproductor => ({
+    id: c.id, audioId: c.audioId as string, titulo: c.titulo,
+    nombreArtista: c.nombreArtista || 'Artista', usuarioId: c.usuarioId,
+    portadaId: c.portadaId, fotoArtista: c.fotoArtista || null,
+  });
+  const agregarFavoritaACola = (c: CancionFavorita, lista: CancionFavorita[]) => {
+    if (!c.audioId) return;
+    cerrarAvisoCola();
+    if (!cancionActual) {
+      const listaReproducible = lista.filter(item => !!item.audioId).map(convertirCancion);
+      reproducirCancion(convertirCancion(c), listaReproducible);
+      abrirReproductor();
+      return;
+    }
+    const indice = colaRef.current.length;
+    if (!agregarACola(convertirCancion(c))) return;
+    setAvisoCola({ titulo: c.titulo, indice, id: c.id });
+    temporizadorCola.current = setTimeout(() => { setAvisoCola(null); temporizadorCola.current = null; }, 5000);
+  };
+  const deshacerCola = () => {
+    if (avisoCola && colaRef.current[avisoCola.indice]?.id === avisoCola.id) quitarDeCola(avisoCola.indice);
+    cerrarAvisoCola();
+  };
+  const abrirColaDesdeAviso = () => {
+    cerrarAvisoCola();
+    router.push({ pathname: '/reproductor', params: { abrirCola: '1' } });
+  };
   const navegacionReproductorBloqueada = useRef(false);
 
   // Impide apilar pantallas del reproductor al tocar rápidamente una tarjeta.
@@ -128,7 +171,7 @@ export default function BibliotecaScreen() {
       };
 
       const cargarMeGustas = async () => {
-        setCargandoGustas(true);
+        if (!listasCargadas.current) setCargandoGustas(true);
         setErrorGustas('');
         try {
           const token = await SecureStore.getItemAsync('token');
@@ -172,7 +215,7 @@ export default function BibliotecaScreen() {
       };
 
       const cargarGuardadas = async () => {
-        setCargandoGuardadas(true);
+        if (!listasCargadas.current) setCargandoGuardadas(true);
         setErrorGuardadas('');
         try {
           const token = await SecureStore.getItemAsync('token');
@@ -216,9 +259,10 @@ export default function BibliotecaScreen() {
 
       void cargarGuardadas();
       void cargarMeGustas();
-      void cargarArtistas();
+      if (revisionBiblioteca === 0) void cargarArtistas();
+      listasCargadas.current = true;
       return () => { activo = false; };
-    }, [intento])
+    }, [intento, revisionBiblioteca])
   );
 
   const abrirFiltroCompleto = (filtro: Exclude<FiltroBiblioteca, 'todos'>) => {
@@ -421,6 +465,7 @@ export default function BibliotecaScreen() {
       const datos = await respuesta.json();
       if (!respuesta.ok) throw new Error(datos.message || 'No se pudo quitar el Me gusta.');
       setCancionesFavoritas(actual => actual.filter(item => item.id !== cancion.id));
+      avisarCambioBiblioteca('me-gustas', cancion.id);
     } catch (err) {
       Alert.alert('Me gusta', err instanceof Error ? err.message : 'No fue posible conectar con UnderMusic.');
     } finally {
@@ -486,6 +531,15 @@ export default function BibliotecaScreen() {
             </View>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={`Añadir ${cancion.titulo} a la cola de reproducción`}
+              disabled={!cancion.audioId}
+              onPress={() => agregarFavoritaACola(cancion, cancionesFavoritas)}
+              style={({ pressed }) => [styles.botonCola, pressed && styles.presionado, !cancion.audioId && styles.botonDesactivado]}
+            >
+              <Ionicons name="list-outline" size={22} color="#FFC477" />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
               accessibilityLabel={`Quitar Me gusta de ${cancion.titulo}`}
               disabled={quitandoMeGusta !== null}
               onPress={() => void quitarMeGusta(cancion)}
@@ -529,6 +583,7 @@ export default function BibliotecaScreen() {
       const datos = await respuesta.json();
       if (!respuesta.ok) throw new Error(datos.message || 'No se pudo quitar la canción de Guardadas.');
       setCancionesGuardadas(actual => actual.filter(item => item.id !== cancion.id));
+      avisarCambioBiblioteca('guardadas', cancion.id);
     } catch (err) {
       Alert.alert('Guardadas', err instanceof Error ? err.message : 'No fue posible conectar con UnderMusic.');
     } finally {
@@ -592,6 +647,15 @@ export default function BibliotecaScreen() {
               <Text style={styles.detalleGuardada} numberOfLines={1}>{cancion.nombreArtista || 'Artista'}</Text>
               <Text style={styles.detalleArtista} numberOfLines={1}>{cancion.generoPrincipal}</Text>
             </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Añadir ${cancion.titulo} a la cola de reproducción`}
+              disabled={!cancion.audioId}
+              onPress={() => agregarFavoritaACola(cancion, cancionesGuardadas)}
+              style={({ pressed }) => [styles.botonCola, pressed && styles.presionado, !cancion.audioId && styles.botonDesactivado]}
+            >
+              <Ionicons name="list-outline" size={22} color="#FFC477" />
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Quitar de Guardadas ${cancion.titulo}`}
@@ -756,12 +820,41 @@ export default function BibliotecaScreen() {
 
 
       </ScrollView>
-      </SafeAreaView>
+      {avisoCola && (
+        <View pointerEvents="box-none" style={styles.toastLayer}>
+          <View style={styles.toastColaCard}>
+            <Pressable style={styles.toastColaMain} onPress={abrirColaDesdeAviso} accessibilityRole="button" accessibilityLabel="Abrir cola de reproducción">
+              <View style={styles.toastColaIcon}><Ionicons name="list" size={24} color="#FFC477" /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.toastColaTitle}>Añadida a la cola</Text>
+                <Text style={styles.toastColaText} numberOfLines={2}>«{avisoCola.titulo}» se añadió a la cola de reproducción.</Text>
+                <Text style={styles.toastColaHint}>Toca para ver la cola</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#FFC477" />
+            </Pressable>
+            <Pressable onPress={deshacerCola} style={styles.toastColaUndo} accessibilityRole="button" accessibilityLabel="Deshacer añadir a la cola">
+              <Ionicons name="arrow-undo-outline" size={16} color="#FFC477" />
+              <Text style={styles.toastColaUndoText}>Deshacer</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+       </SafeAreaView>
     </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  botonCola: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(183,109,28,0.18)', borderWidth: 1, borderColor: 'rgba(232,166,75,0.65)' },
+  toastLayer: { position: 'absolute', top: 12, left: 14, right: 14, alignItems: 'center', zIndex: 100, elevation: 12 },
+  toastColaCard: { width: '100%', maxWidth: 600, borderRadius: 20, backgroundColor: '#211527', borderWidth: 1.5, borderColor: 'rgba(232,166,75,0.65)', overflow: 'hidden', elevation: 12 },
+  toastColaMain: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  toastColaIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(183,109,28,0.18)', alignItems: 'center', justifyContent: 'center' },
+  toastColaTitle: { color: '#FFC477', fontSize: 13, fontWeight: '800' },
+  toastColaText: { color: '#FFFFFF', fontSize: 13, lineHeight: 18, marginTop: 2 },
+  toastColaHint: { color: '#BDAFCB', fontSize: 11, marginTop: 3 },
+  toastColaUndo: { borderTopWidth: 1, borderTopColor: 'rgba(232,166,75,0.2)', paddingVertical: 8, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 5 },
+  toastColaUndoText: { color: '#FFC477', fontSize: 12, fontWeight: '700' },
   contenedor: { flex: 1, backgroundColor: '#020106' },
   controlesColeccion: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 },
   reproducirTodoBoton: { flex: 1, minWidth: 0, minHeight: 47, borderRadius: 25, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 10 },

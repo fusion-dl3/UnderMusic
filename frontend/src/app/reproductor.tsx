@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import {
   ActivityIndicator,
@@ -18,6 +18,9 @@ import {
   AccessibilityInfo,
   Easing,
   ImageBackground,
+  Modal,
+  PanResponder,
+  ScrollView,
   Pressable,
   Share,
   StyleSheet,
@@ -322,6 +325,7 @@ function BordePortadaAnimado({
 }
 
 export default function ReproductorScreen() {
+  const { abrirCola } = useLocalSearchParams<{ abrirCola?: string }>();
   const progressBarRef =
   useRef<View>(null);
 
@@ -336,7 +340,14 @@ const progressBarWidth =
 ] = useState<number | null>(null);
   const {
   cancionActual,
-  cola,
+  colaManual,
+  colaPendienteAutomatica,
+  abrirVentanaCola,
+  quitarDeCola,
+  moverEnCola,
+  vaciarColaManual,
+  tieneSiguiente,
+  tieneAnterior,
   reproduciendo,
   posicion,
   duracion,
@@ -347,6 +358,9 @@ const progressBarWidth =
   reproducirSiguiente,
   } = usePlayer();
 
+  useEffect(() => {
+    if (abrirCola === '1') abrirVentanaCola();
+  }, [abrirCola]);
   const cancionId = cancionActual?.id ?? null;
   const [meGusta, setMeGusta] = useState(false);
   const [guardada, setGuardada] = useState(false);
@@ -500,20 +514,7 @@ const mensaje = `🎵 ¡Escucha "${cancionActual.titulo}" de ${cancionActual.nom
     : cancionActual.fotoArtista
       ? `${API_URL}/api/usuarios/foto-perfil/${cancionActual.fotoArtista}`
       : null;
-  const indiceActual = cola.findIndex(
-  (cancion) =>
-    cancion.id === cancionActual.id
-);
-
-const tieneAnterior =
-  indiceActual > 0;
-
-const tieneSiguiente =
-  indiceActual >= 0 &&
-  indiceActual < cola.length - 1;
-
-const puedeUsarAnterior =
-  posicion >= 5 || tieneAnterior;
+  const puedeUsarAnterior = posicion >= 5 || tieneAnterior;
 
 const obtenerProgresoDesdePageX = (
   pageX: number
@@ -703,6 +704,19 @@ const progresoVisible =
               </View>
               <View style={styles.songActions}>
                 <Pressable
+                  style={styles.queueActionButton}
+                  onPress={abrirVentanaCola}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Abrir cola de reproducción, ${colaManual.length + colaPendienteAutomatica.length} canciones pendientes`}
+                >
+                  <Ionicons name="list" size={24} color="#FFC477" />
+                  {colaManual.length > 0 && (
+                    <View style={styles.queueCountBadge}>
+                      <Text style={styles.queueCountText}>{colaManual.length > 99 ? '99+' : colaManual.length}</Text>
+                    </View>
+                  )}
+                </Pressable>
+                <Pressable
                   style={styles.saveButton}
                   onPress={alternarGuardada}
                   disabled={cargandoAcciones || procesandoGuardada}
@@ -868,6 +882,39 @@ const progresoVisible =
 }
 
 const styles = StyleSheet.create({
+  queueActionButton: {width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(183,109,28,0.18)', borderWidth: 1, borderColor: 'rgba(232,166,75,0.65)'},
+  queueCountBadge: {position: 'absolute', top: -5, right: -5, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFC477'},
+  queueCountText: {color: '#251308', fontSize: 10, fontWeight: '800'},
+  queueOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)'},
+  queuePanel: {height: '72%', backgroundColor: '#160D28', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, borderWidth: 1, borderColor: '#7043A4'},
+  queueDragZone: {height: 46, marginTop: -12, marginBottom: 3, alignItems: 'center', justifyContent: 'center'},
+  queueDragPill: {width: 48, height: 5, borderRadius: 4, backgroundColor: '#A78DBA'},
+  queueHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22, paddingTop: 14},
+  queueDragHandle: {position: 'absolute', top: -12, alignSelf: 'center', left: '43%', width: '14%', height: 5, borderRadius: 4, backgroundColor: '#8E759F'},
+  queueTitle: {color: '#FFFFFF', fontSize: 21, fontWeight: '800'},
+  queueSectionLabel: {color: '#BCA8D1', fontSize: 11, fontWeight: '800', letterSpacing: 1},
+  queueNow: {color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginTop: 8, marginBottom: 22},
+  queueSubheader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12},
+  queueClear: {color: '#E4A4FF', fontWeight: '700', fontSize: 13},
+  queueConfirmOverlay: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.78)', paddingHorizontal: 24},
+  queueConfirmCard: {width: '100%', maxWidth: 390, backgroundColor: '#1B102D', borderWidth: 1, borderColor: 'rgba(232,166,75,0.55)', borderRadius: 24, padding: 24, alignItems: 'center'},
+  queueConfirmIcon: {width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(183,109,28,0.18)', borderWidth: 1, borderColor: 'rgba(232,166,75,0.65)', marginBottom: 16},
+  queueConfirmTitle: {color: '#FFFFFF', fontSize: 19, fontWeight: '800', textAlign: 'center'},
+  queueConfirmMessage: {color: '#C8BDD4', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 12, marginBottom: 24},
+  queueConfirmActions: {width: '100%', flexDirection: 'row', gap: 10},
+  queueConfirmButton: {flex: 1, minHeight: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8},
+  queueConfirmCancel: {backgroundColor: 'rgba(112,67,164,0.24)', borderWidth: 1, borderColor: 'rgba(180,125,230,0.45)'},
+  queueConfirmCancelText: {color: '#E6D7F4', fontWeight: '800', fontSize: 14},
+  queueConfirmDelete: {backgroundColor: 'rgba(183,109,28,0.24)', borderWidth: 1, borderColor: 'rgba(232,166,75,0.7)'},
+  queueConfirmDeleteText: {color: '#FFC477', fontWeight: '800', fontSize: 14},
+  queueList: {flex: 1},
+  queueItem: {flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: 'rgba(180,125,230,0.2)'},
+  queueSong: {color: '#FFFFFF', fontWeight: '700', fontSize: 14},
+  queueArtist: {color: '#AFA1BF', fontSize: 12, marginTop: 4},
+  queueIcon: {padding: 5},
+  queueEmpty: {color: '#BCA8D1', fontSize: 14, lineHeight: 21, paddingVertical: 20},
+  queueGroupLabel: {color: '#D2B4F1', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginTop: 14, marginBottom: 6},
+  queueFootnote: {color: '#9386A4', fontSize: 12, lineHeight: 18, marginTop: 20},
   background: {
     flex: 1,
     backgroundColor: '#020106',
@@ -1024,7 +1071,7 @@ degradadoBarra: {
   songActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 7,
   },
 
   saveButton: {

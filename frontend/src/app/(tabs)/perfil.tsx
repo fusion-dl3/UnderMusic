@@ -22,7 +22,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Usuario = {
   id: string;
@@ -76,13 +76,81 @@ type EstadisticasArtista = {
 
 export default function PerfilScreen() {
   const { width: anchoPantalla } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const {
   cancionActual,
   reproduciendo,
   reproducirCancion,
   alternarReproduccion,
+  agregarACola,
+  colaManual,
+  quitarDeCola,
 } = usePlayer();
+
+  const [avisoCola, setAvisoCola] = useState<{ titulo: string; id: string; indice: number } | null>(null);
+  const temporizadorCola = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (temporizadorCola.current) clearTimeout(temporizadorCola.current);
+  }, []);
+
+  const cerrarAvisoCola = () => {
+    if (temporizadorCola.current) clearTimeout(temporizadorCola.current);
+    temporizadorCola.current = null;
+    setAvisoCola(null);
+  };
+
+  const anadirCancionACola = (cancion: Cancion) => {
+    if (!usuario || !cancion.audioId) return;
+    const nombreArtista = perfilArtista?.nombreArtistico || usuario.nombreUsuario;
+    if (!cancionActual) {
+      // La primera canción inicia la reproducción y abre el reproductor completo.
+      const lista: CancionReproductor[] = canciones.filter(item => Boolean(item.audioId)).map(item => ({
+        id: item.id,
+        audioId: item.audioId as string,
+        titulo: item.titulo,
+        nombreArtista,
+        usuarioId: usuario.id,
+        portadaId: item.portadaId,
+        fotoArtista: usuario.fotoPerfil || null,
+      }));
+      const seleccionada = lista.find(item => item.id === cancion.id);
+      if (!seleccionada) return;
+      cerrarAvisoCola();
+      reproducirCancion(seleccionada, lista);
+      router.push('/reproductor');
+      return;
+    }
+    const agregada = agregarACola({
+      id: cancion.id,
+      audioId: cancion.audioId,
+      titulo: cancion.titulo,
+      nombreArtista,
+      usuarioId: usuario.id,
+      portadaId: cancion.portadaId,
+      fotoArtista: usuario.fotoPerfil || null,
+    });
+    if (!agregada) return;
+    if (temporizadorCola.current) clearTimeout(temporizadorCola.current);
+    setAvisoCola({ titulo: cancion.titulo, id: cancion.id, indice: colaManual.length });
+    temporizadorCola.current = setTimeout(() => {
+      setAvisoCola(null);
+      temporizadorCola.current = null;
+    }, 5000);
+  };
+
+  const deshacerUltimaAdicion = () => {
+    if (!avisoCola) return;
+    if (colaManual[avisoCola.indice]?.id === avisoCola.id) {
+      quitarDeCola(avisoCola.indice);
+    }
+    cerrarAvisoCola();
+  };
+
+  const abrirColaDesdeAviso = () => {
+    cerrarAvisoCola();
+    router.push({ pathname: '/reproductor', params: { abrirCola: '1' } });
+  };
 
   const [perfilArtista, setPerfilArtista] =
     useState<PerfilArtista | null>(null);
@@ -799,10 +867,13 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                           <Pressable style={[styles.songShareButton, anchoPantalla < 620 && styles.songActionCompact]} onPress={(event) => { event.stopPropagation(); void compartirCancion(cancion); }} accessibilityRole="button" accessibilityLabel={`Compartir ${cancion.titulo}`}>
                             <Ionicons name="share-social-outline" size={18} color="#DDB9FF" />
                           </Pressable>
-                          <Pressable style={[styles.songQueueButton, anchoPantalla < 620 && styles.songActionCompact]} disabled accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel={`Añadir ${cancion.titulo} a la cola (próximamente)`}>
-                            <Ionicons name="list-outline" size={19} color="#B7A6C7" />
-                          </Pressable>
-                          <Pressable style={[styles.songSaveButton, anchoPantalla < 620 && styles.songActionCompact]} disabled={procesandoGuardada !== null} onPress={(event) => { event.stopPropagation(); void alternarInteraccion(cancion.id, 'guardadas'); }} accessibilityRole="button" accessibilityLabel={`${guardadas.includes(cancion.id) ? 'Quitar de Guardadas' : 'Guardar'} ${cancion.titulo}`}>
+                                                     <Pressable style={[styles.songQueueButton, anchoPantalla < 620 && styles.songActionCompact]} disabled={!cancion.audioId} onPress={(event) => {
+                             event.stopPropagation();
+                             anadirCancionACola(cancion);
+                           }} accessibilityRole="button" accessibilityLabel={`Añadir ${cancion.titulo} a la cola`}>
+                             <Ionicons name="list-outline" size={19} color={cancion.audioId ? '#FFC477' : '#8C7865'} />
+                           </Pressable>
+<Pressable style={[styles.songSaveButton, anchoPantalla < 620 && styles.songActionCompact]} disabled={procesandoGuardada !== null} onPress={(event) => { event.stopPropagation(); void alternarInteraccion(cancion.id, 'guardadas'); }} accessibilityRole="button" accessibilityLabel={`${guardadas.includes(cancion.id) ? 'Quitar de Guardadas' : 'Guardar'} ${cancion.titulo}`}>
                             {procesandoGuardada === cancion.id ? <ActivityIndicator size="small" color="#54E6FF" /> : <Ionicons name={guardadas.includes(cancion.id) ? 'bookmark' : 'bookmark-outline'} size={19} color={guardadas.includes(cancion.id) ? '#54E6FF' : '#9FD9E5'} />}
                           </Pressable>
                           <Pressable style={[styles.songLikeButton, anchoPantalla < 620 && styles.songActionCompact]} disabled={procesandoMeGusta !== null} onPress={(event) => { event.stopPropagation(); void alternarInteraccion(cancion.id, 'me-gustas'); }} accessibilityRole="button" accessibilityLabel={`${meGustas.includes(cancion.id) ? 'Quitar Me gusta de' : 'Dar Me gusta a'} ${cancion.titulo}`}>
@@ -1013,6 +1084,25 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
             </View>
           </View>
         </ScrollView>
+        {avisoCola ? (
+          <View pointerEvents="box-none" style={[styles.colaToastLayer, { top: 18 }]}>
+            <View style={styles.colaToastCard}>
+              <Pressable style={styles.colaToastMain} onPress={abrirColaDesdeAviso} accessibilityRole="button" accessibilityLabel="Ver cola de reproducción">
+                <View style={styles.colaToastIcon}><Ionicons name="list-outline" size={23} color="#FFC477" /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.colaToastTitle}>Añadida a la cola</Text>
+                  <Text style={styles.colaToastText} numberOfLines={2}>«{avisoCola.titulo}» se añadió a la cola de reproducción.</Text>
+                  <Text style={styles.colaToastHint}>Toca para ver la cola</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#FFC477" />
+              </Pressable>
+              <Pressable style={styles.colaToastUndo} onPress={deshacerUltimaAdicion} accessibilityRole="button" accessibilityLabel={`Deshacer añadir ${avisoCola.titulo} a la cola`}>
+                <Ionicons name="arrow-undo-outline" size={16} color="#FFC477" />
+                <Text style={styles.colaToastUndoText}>Deshacer</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
         <Modal
           visible={cancionMenu !== null}
           transparent
@@ -1133,6 +1223,16 @@ function AnimatedStatsBar({ indice }: { indice: number }) {
 }
 
 const styles = StyleSheet.create({
+  colaToastLayer: { position: 'absolute', left: 16, right: 16, zIndex: 100, elevation: 20, alignItems: 'center' },
+  colaToastCard: { width: '100%', maxWidth: 600, borderRadius: 19, overflow: 'hidden', backgroundColor: '#25170F', borderWidth: 1, borderColor: 'rgba(232,166,75,0.65)', shadowColor: '#E8A64B', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } },
+  colaToastMain: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  colaToastIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(183,109,28,0.18)', alignItems: 'center', justifyContent: 'center' },
+  colaToastTitle: { color: '#FFC477', fontSize: 13, fontWeight: '800' },
+  colaToastText: { color: '#FFFFFF', fontSize: 13, lineHeight: 18, marginTop: 2 },
+  colaToastHint: { color: '#BDAFCB', fontSize: 11, marginTop: 3 },
+  colaToastUndo: { borderTopWidth: 1, borderTopColor: 'rgba(232,166,75,0.2)', paddingVertical: 8, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 5 },
+  colaToastUndoText: { color: '#FFC477', fontSize: 12, fontWeight: '700' },
+
   background: {
     flex: 1,
     backgroundColor: '#020106',
@@ -1620,7 +1720,7 @@ publishSongButtonText: {
     borderColor: 'rgba(190, 129, 255, 0.45)',
   },
 
-  songQueueButton: { flexShrink: 0, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 0, backgroundColor: 'rgba(91, 80, 112, 0.13)', borderWidth: 1, borderColor: 'rgba(170, 151, 192, 0.32)', opacity: 0.55 },
+  songQueueButton: { flexShrink: 0, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 0, backgroundColor: 'rgba(183, 109, 28, 0.18)', borderWidth: 1, borderColor: 'rgba(232, 166, 75, 0.65)' },
 
   songSaveButton: {
     flexShrink: 0,
