@@ -4,6 +4,7 @@ const {
   registrarUsuario,
   iniciarSesion,
   obtenerUsuarioActual,
+  obtenerUsuarioPublico,
   actualizarPreferenciasMusicales,
   actualizarPerfilUsuario,
   cambiarCorreoCuenta,
@@ -27,6 +28,12 @@ const router = express.Router();
 
 router.post('/registro', registrarUsuario);
 router.post('/login', iniciarSesion);
+
+router.get(
+  '/publico/:usuarioId',
+  verificarToken,
+  obtenerUsuarioPublico
+);
 
 router.get(
   '/me',

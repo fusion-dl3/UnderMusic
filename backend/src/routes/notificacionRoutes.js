@@ -1,0 +1,10 @@
+const router = require('express').Router();
+const { verificarToken } = require('../middlewares/authMiddleware');
+const c = require('../controllers/notificacionController');
+router.use(verificarToken);
+router.get('/', c.listar);
+router.get('/contador', c.contador);
+router.patch('/leer-todas', c.marcarTodas);
+router.patch('/:id/leer', c.marcarLeida);
+router.delete('/:id', c.eliminar);
+module.exports = router;

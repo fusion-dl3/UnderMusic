@@ -1,7 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Image,
   ImageBackground,
@@ -14,6 +16,70 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
   const buttonScale = useRef(new Animated.Value(1)).current;
+  const [comprobandoSesion, setComprobandoSesion] = useState(true);
+  const [errorConexion, setErrorConexion] = useState(false);
+  const [intento, setIntento] = useState(0);
+
+  useEffect(() => {
+    let activo = true;
+    const controlador = new AbortController();
+    const tiempoLimite = setTimeout(() => controlador.abort(), 10000);
+
+    const comprobarSesion = async () => {
+      try {
+        const token = await SecureStore.getItemAsync('token');
+        if (!activo) return;
+
+        if (!token) {
+          setErrorConexion(false);
+          setComprobandoSesion(false);
+          return;
+        }
+
+        const respuesta = await fetch('http://192.168.1.5:3000/api/usuarios/me', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}`, },
+          signal: controlador.signal,
+        });
+        if (!activo) return;
+
+        if (respuesta.ok) {
+          router.replace('/inicio');
+          return;
+        }
+
+        if (respuesta.status === 401 || respuesta.status === 403) {
+          await SecureStore.deleteItemAsync('token');
+          if (!activo) return;
+          setErrorConexion(false);
+          setComprobandoSesion(false);
+          return;
+        }
+
+        // Un fallo del servidor no implica que el token sea inválido.
+        setErrorConexion(true);
+        setComprobandoSesion(false);
+      } catch (error) {
+        if (!activo) return;
+        console.warn('No se pudo validar la sesión:', error);
+        setErrorConexion(true);
+        setComprobandoSesion(false);
+      }
+    };
+
+    void comprobarSesion();
+    return () => {
+      activo = false;
+      clearTimeout(tiempoLimite);
+      controlador.abort();
+    };
+  }, [intento]);
+
+  const reintentarConexion = () => {
+    setErrorConexion(false);
+    setComprobandoSesion(true);
+    setIntento((valor) => valor + 1);
+  };
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -37,6 +103,29 @@ export default function HomeScreen() {
       animation.stop();
     };
   }, [buttonScale]);
+
+  if (comprobandoSesion) {
+    return (
+      <View style={styles.estadoSesion}>
+        <ActivityIndicator size="large" color="#A966FF" />
+        <Text style={styles.estadoTexto}>Comprobando sesión...</Text>
+      </View>
+    );
+  }
+
+  if (errorConexion) {
+    return (
+      <View style={styles.estadoSesion}>
+        <Text style={styles.errorTitulo}>No pudimos conectar con UnderMusic</Text>
+        <Text style={styles.estadoTexto}>
+          Comprueba tu conexión y que el servidor esté encendido. Tu sesión sigue guardada.
+        </Text>
+        <Pressable onPress={reintentarConexion} style={styles.reintentarBoton}>
+          <Text style={styles.reintentarTexto}>Reintentar</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -150,6 +239,37 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  estadoSesion: {
+    flex: 1,
+    backgroundColor: '#020106',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+    gap: 18,
+  },
+  estadoTexto: {
+    color: '#D9D8E3',
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  errorTitulo: {
+    color: '#FFFFFF',
+    fontSize: 21,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  reintentarBoton: {
+    backgroundColor: '#7137A8',
+    paddingHorizontal: 32,
+    paddingVertical: 15,
+    borderRadius: 16,
+  },
+  reintentarTexto: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   container: {
     flex: 1,
     backgroundColor: '#020106',

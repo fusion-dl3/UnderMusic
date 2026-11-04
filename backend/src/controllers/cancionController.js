@@ -1,3 +1,4 @@
+const { intentarNotificar, notificarLanzamiento } = require('../services/notificacionesService');
 const {
   GridFSBucket,
   ObjectId
@@ -360,6 +361,8 @@ async function publicarCancion(req, res) {
       await canciones.insertOne(
         nuevaCancion
       );
+
+    await intentarNotificar(() => notificarLanzamiento(usuarioId, resultado.insertedId, nuevaCancion.titulo));
 
     return res.status(201).json({
       message:

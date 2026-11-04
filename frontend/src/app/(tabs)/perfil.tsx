@@ -100,24 +100,33 @@ export default function PerfilScreen() {
     setAvisoCola(null);
   };
 
+  // Mantener el orden del catálogo, comenzando por la canción elegida.
+  const construirColaCircular = (seleccionada: Cancion): CancionReproductor[] => {
+    if (!usuario) return [];
+    const disponibles = canciones.filter((item): item is Cancion & { audioId: string } => Boolean(item.audioId));
+    const inicio = disponibles.findIndex((item) => item.id === seleccionada.id);
+    if (inicio < 0) return [];
+    const recorrido = [...disponibles.slice(inicio), ...disponibles.slice(0, inicio)];
+    return recorrido.map((item) => ({
+      id: item.id,
+      audioId: item.audioId,
+      titulo: item.titulo,
+      nombreArtista: perfilArtista?.nombreArtistico || usuario.nombreUsuario,
+      usuarioId: usuario.id,
+      portadaId: item.portadaId,
+      fotoArtista: usuario.fotoPerfil || null,
+    }));
+  };
+
   const anadirCancionACola = (cancion: Cancion) => {
     if (!usuario || !cancion.audioId) return;
     const nombreArtista = perfilArtista?.nombreArtistico || usuario.nombreUsuario;
     if (!cancionActual) {
       // La primera canción inicia la reproducción y abre el reproductor completo.
-      const lista: CancionReproductor[] = canciones.filter(item => Boolean(item.audioId)).map(item => ({
-        id: item.id,
-        audioId: item.audioId as string,
-        titulo: item.titulo,
-        nombreArtista,
-        usuarioId: usuario.id,
-        portadaId: item.portadaId,
-        fotoArtista: usuario.fotoPerfil || null,
-      }));
-      const seleccionada = lista.find(item => item.id === cancion.id);
-      if (!seleccionada) return;
+      const lista = construirColaCircular(cancion);
+      if (!lista.length) return;
       cerrarAvisoCola();
-      reproducirCancion(seleccionada, lista);
+      reproducirCancion(lista[0], lista, true);
       router.push('/reproductor');
       return;
     }
@@ -898,34 +907,13 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                                 return;
                               }
 
-                              const colaReproductor: CancionReproductor[] =
-                                canciones
-                                  .filter((item) => item.audioId !== null)
-                                  .map((item) => ({
-                                    id: item.id,
-                                    audioId: item.audioId as string,
-                                    titulo: item.titulo,
-                                    nombreArtista:
-                                      perfilArtista?.nombreArtistico ||
-                                      usuario.nombreUsuario,
-                                      usuarioId: usuario.id,
-                                    portadaId: item.portadaId,
-                                    fotoArtista:
-                                      usuario.fotoPerfil || null,
-                                  }));
-
-                              const cancionParaReproductor =
-                                colaReproductor.find(
-                                  (item) => item.id === cancion.id
-                                );
-
-                              if (!cancionParaReproductor) {
-                                return;
-                              }
+                              const colaReproductor = construirColaCircular(cancion);
+                              if (colaReproductor.length === 0) return;
 
                               reproducirCancion(
-                                cancionParaReproductor,
-                                colaReproductor
+                                colaReproductor[0],
+                                colaReproductor,
+                                true
                               );
 
                               router.push('/reproductor');

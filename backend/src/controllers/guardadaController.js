@@ -1,5 +1,6 @@
 
 const { ObjectId } = require('mongodb');
+const { intentarNotificar, notificarInteraccion } = require('../services/notificacionesService');
 
 const {
   getGuardadasCollection,
@@ -37,7 +38,7 @@ async function guardarCancion(req, res) {
 
     const guardadas = getGuardadasCollection();
 
-    await guardadas.updateOne(
+    const resultadoOperacion = await guardadas.updateOne(
       {
         usuarioId,
         cancionId: cancionObjectId,
@@ -53,6 +54,13 @@ async function guardarCancion(req, res) {
         upsert: true,
       }
     );
+
+    if (resultadoOperacion.upsertedCount) {
+      await intentarNotificar(async () => {
+        const total = await guardadas.countDocuments({ cancionId: cancionObjectId });
+        await notificarInteraccion(cancion, 'hito_guardados', total);
+      });
+    }
 
     return res.status(200).json({
       message: 'Canción guardada correctamente.',

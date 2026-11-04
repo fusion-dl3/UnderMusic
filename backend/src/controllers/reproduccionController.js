@@ -1,5 +1,6 @@
 
 const { ObjectId } = require('mongodb');
+const { intentarNotificar, notificarInteraccion } = require('../services/notificacionesService');
 
 const {
   getReproduccionesCollection,
@@ -54,6 +55,11 @@ async function registrarReproduccion(req, res) {
       cancionId: cancion._id,
       artistaId: cancion.usuarioId,
       fechaEscucha: new Date(),
+    });
+
+    await intentarNotificar(async () => {
+      const total = await getReproduccionesCollection().countDocuments({ cancionId: cancion._id });
+      await notificarInteraccion(cancion, 'hito_reproducciones', total);
     });
 
     return res.status(201).json({

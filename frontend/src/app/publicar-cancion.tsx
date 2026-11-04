@@ -71,6 +71,8 @@ export default function PublicarCancionScreen() {
   ] = useState(false);
 
   const [publicando, setPublicando] = useState(false);
+  const publicacionIniciada = useRef(false);
+  const [cancionYaCreada, setCancionYaCreada] = useState(false);
   const [error, setError] = useState('');
 
   const [modalSalirVisible, setModalSalirVisible] = useState(false);
@@ -115,13 +117,15 @@ export default function PublicarCancionScreen() {
       titulo.trim().length > 0 &&
       generoPrincipal !== null &&
       archivoMp3 !== null &&
-      !publicando
+      !publicando &&
+      !cancionYaCreada
     );
   }, [
     titulo,
     generoPrincipal,
     archivoMp3,
     publicando,
+    cancionYaCreada,
   ]);
 
     const seleccionarMp3 = async () => {
@@ -331,7 +335,7 @@ export default function PublicarCancionScreen() {
   };
 
     const publicarCancion = async () => {
-    if (publicando) {
+    if (publicando || publicacionIniciada.current || cancionYaCreada) {
       return;
     }
 
@@ -359,6 +363,8 @@ export default function PublicarCancionScreen() {
       return;
     }
 
+    publicacionIniciada.current = true;
+    let guardadaEnServidor = false;
     try {
       setPublicando(true);
       setError('');
@@ -433,12 +439,16 @@ export default function PublicarCancionScreen() {
         return;
       }
 
+      guardadaEnServidor = true;
+      setCancionYaCreada(true);
+
       /*
        * Si el usuario no eligió portada,
        * la publicación ya terminó.
        */
       if (!archivoPortada) {
-        router.back();
+        setSalidaAutorizada(true);
+        setSalidaPendiente(true);
         return;
       }
 
@@ -453,7 +463,7 @@ export default function PublicarCancionScreen() {
 
       if (!cancionId) {
         setError(
-          'La canción fue publicada, pero no fue posible asociar la portada.'
+          'La canción fue publicada, pero no fue posible asociar la portada. Revisa tu catálogo antes de intentar otra publicación.'
         );
 
         return;
@@ -501,7 +511,7 @@ export default function PublicarCancionScreen() {
       ) {
         setError(
           datosPortada.message ||
-            'La canción fue publicada, pero no fue posible guardar la portada.'
+            'La canción fue publicada, pero no fue posible guardar la portada. Revisa tu catálogo antes de intentar otra publicación.'
         );
 
         return;
@@ -520,9 +530,12 @@ export default function PublicarCancionScreen() {
       );
 
       setError(
-        'No fue posible conectar con UnderMusic.'
+        guardadaEnServidor
+          ? 'La canción ya fue publicada, pero ocurrió un problema al subir la portada. No vuelvas a publicarla: revisa tu catálogo.'
+          : 'No fue posible conectar con UnderMusic. Comprueba si la canción apareció en tu catálogo antes de reintentar.'
       );
     } finally {
+      if (!guardadaEnServidor) publicacionIniciada.current = false;
       setPublicando(false);
     }
   };

@@ -622,6 +622,68 @@ async function cambiarPasswordCuenta(req, res) {
   }
 }
 
+
+async function obtenerUsuarioPublico(req, res) {
+  try {
+    const { usuarioId } = req.params;
+
+    if (!ObjectId.isValid(usuarioId)) {
+      return res.status(400).json({
+        message: 'El identificador del usuario no es válido'
+      });
+    }
+
+    const usuario = await getUsuariosCollection().findOne(
+      { _id: new ObjectId(usuarioId) },
+      {
+        projection: {
+          nombreUsuario: 1,
+          rol: 1,
+          fotoPerfil: 1,
+          ubicacion: 1,
+          mostrarUbicacion: 1,
+          generosFavoritos: 1
+        }
+      }
+    );
+
+    if (!usuario) {
+      return res.status(404).json({
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    return res.status(200).json({
+      usuario: {
+        id: usuario._id.toString(),
+        nombreUsuario: usuario.nombreUsuario,
+        rol: usuario.rol,
+        fotoPerfil: usuario.fotoPerfil || null,
+
+        generosFavoritos: Array.isArray(usuario.generosFavoritos)
+          ? usuario.generosFavoritos
+          : [],
+
+        ubicacion: usuario.mostrarUbicacion === true
+          ? {
+              pais: usuario.ubicacion?.pais || '',
+              region: usuario.ubicacion?.region || '',
+              comuna: usuario.ubicacion?.comuna || ''
+            }
+          : null
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al obtener usuario público:', error);
+
+    return res.status(500).json({
+      message: 'No fue posible consultar el perfil público'
+    });
+  }
+}
+
+
 module.exports = {
   registrarUsuario,
   iniciarSesion,
@@ -629,5 +691,6 @@ module.exports = {
   actualizarPreferenciasMusicales,
   actualizarPerfilUsuario,
   cambiarCorreoCuenta,
-  cambiarPasswordCuenta
+  cambiarPasswordCuenta,
+  obtenerUsuarioPublico
 };

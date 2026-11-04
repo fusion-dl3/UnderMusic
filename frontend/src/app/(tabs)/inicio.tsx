@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as SecureStore from 'expo-secure-store';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { CancionReproductor, usePlayer } from '@/context/PlayerContext';
+import { useNotificaciones } from '@/context/NotificacionesContext';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -232,6 +233,17 @@ export default function InicioScreen() {
     router.push('/reproductor');
     return true;
   }, []);
+
+  const {
+    noLeidas: notificacionesNoLeidas,
+    actualizarContador,
+  } = useNotificaciones();
+
+  useFocusEffect(
+    useCallback(() => {
+      void actualizarContador();
+    }, [actualizarContador])
+  );
 
   const [actualizando, setActualizando] = useState(false);
   const [cancionesRecientes, setCancionesRecientes] = useState<CancionReciente[]>([]);
@@ -653,18 +665,20 @@ export default function InicioScreen() {
               resizeMode="contain"
             />
 
-            <Pressable style={styles.notificationButton}>
-              <Ionicons
-                name="notifications-outline"
-                size={34}
-                color="#F25CFF"
-              />
-
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>
-                  3
-                </Text>
-              </View>
+            <Pressable
+              style={styles.notificationButton}
+              accessibilityRole="button"
+              accessibilityLabel={`Notificaciones, ${notificacionesNoLeidas} sin leer`}
+              onPress={() => router.push('/notificaciones')}
+            >
+              <Ionicons name="notifications-outline" size={34} color="#F25CFF" />
+              {notificacionesNoLeidas > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {notificacionesNoLeidas > 99 ? '99+' : notificacionesNoLeidas}
+                  </Text>
+                </View>
+              )}
             </Pressable>
           </View>
 

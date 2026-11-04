@@ -1,4 +1,5 @@
 const { ObjectId } = require('mongodb');
+const { intentarNotificar, notificarNuevoSeguidor } = require('../services/notificacionesService');
 
 const {
   getSeguimientosCollection
@@ -96,6 +97,8 @@ async function seguirArtista(req, res) {
       await seguimientos.countDocuments({
         artistaId: artistaObjectId
       });
+
+    await intentarNotificar(() => notificarNuevoSeguidor(artistaObjectId, seguidorId, cantidadSeguidores));
 
     return res.status(201).json({
       message:

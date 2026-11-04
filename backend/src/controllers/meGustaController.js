@@ -1,4 +1,5 @@
 const { ObjectId } = require('mongodb');
+const { intentarNotificar, notificarInteraccion } = require('../services/notificacionesService');
 
 const {
   getMeGustasCollection
@@ -35,7 +36,7 @@ async function darMeGusta(req, res) {
 
     const meGustas = getMeGustasCollection();
 
-    await meGustas.updateOne(
+    const resultadoOperacion = await meGustas.updateOne(
       {
         usuarioId,
         cancionId: cancionObjectId
@@ -51,6 +52,13 @@ async function darMeGusta(req, res) {
         upsert: true
       }
     );
+
+    if (resultadoOperacion.upsertedCount) {
+      await intentarNotificar(async () => {
+        const total = await meGustas.countDocuments({ cancionId: cancionObjectId });
+        await notificarInteraccion(cancion, 'hito_me_gusta', total);
+      });
+    }
 
     return res.status(200).json({
       message: 'Me gusta registrado correctamente',
