@@ -83,7 +83,7 @@ const [modalSalirVisible, setModalSalirVisible] = useState(false);
       }
 
       const respuesta = await fetch(
-        'http://192.168.1.5:3000/api/usuarios/me',
+        'http://192.168.1.13:3000/api/usuarios/me',
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -263,7 +263,7 @@ const descartarCambios = () => {
     }
 
     const respuestaPerfil = await fetch(
-      'http://192.168.1.5:3000/api/usuarios/me/perfil',
+      'http://192.168.1.13:3000/api/usuarios/me/perfil',
       {
         method: 'PATCH',
         headers: {
@@ -316,7 +316,7 @@ const descartarCambios = () => {
       const archivoFoto = new File(fotoPerfilTemporal);
 
       const resultadoFoto = await archivoFoto.upload(
-        'http://192.168.1.5:3000/api/usuarios/me/foto-perfil',
+        'http://192.168.1.13:3000/api/usuarios/me/foto-perfil',
         {
           httpMethod: 'PATCH',
           uploadType: UploadType.MULTIPART,
@@ -523,7 +523,7 @@ const descartarCambios = () => {
 ) : usuarioOriginal?.fotoPerfil ? (
   <Image
     source={{
-      uri: `http://192.168.1.5:3000/api/usuarios/foto-perfil/${usuarioOriginal.fotoPerfil}`,
+      uri: `http://192.168.1.13:3000/api/usuarios/foto-perfil/${usuarioOriginal.fotoPerfil}`,
     }}
     style={styles.avatarImage}
     resizeMode="cover"

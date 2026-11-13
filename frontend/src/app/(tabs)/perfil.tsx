@@ -190,7 +190,7 @@ export default function PerfilScreen() {
     try {
       const token = await SecureStore.getItemAsync('token');
       if (!token) throw new Error('Debes iniciar sesión.');
-      const respuesta = await fetch(`http://192.168.1.5:3000/api/canciones/${cancion.id}`, {
+      const respuesta = await fetch(`http://192.168.1.13:3000/api/canciones/${cancion.id}`, {
         method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
       });
       const datos = await respuesta.json();
@@ -231,7 +231,7 @@ export default function PerfilScreen() {
       }
 
       const respuestaUsuario = await fetch(
-        'http://192.168.1.5:3000/api/usuarios/me',
+        'http://192.168.1.13:3000/api/usuarios/me',
         {
           method: 'GET',
           headers: {
@@ -256,7 +256,7 @@ export default function PerfilScreen() {
 
       if (usuarioCargado.rol === 'artista') {
         const respuestaPerfilArtista = await fetch(
-          'http://192.168.1.5:3000/api/perfiles-artista/me',
+          'http://192.168.1.13:3000/api/perfiles-artista/me',
           {
             method: 'GET',
             headers: {
@@ -283,7 +283,7 @@ export default function PerfilScreen() {
         // Las estadísticas no deben bloquear el resto del perfil si falla la consulta.
         try {
           const respuestaEstadisticas = await fetch(
-            `http://192.168.1.5:3000/api/perfiles-artista/${usuarioCargado.id}/estadisticas`
+            `http://192.168.1.13:3000/api/perfiles-artista/${usuarioCargado.id}/estadisticas`
           );
           if (respuestaEstadisticas.ok) {
             const datos: EstadisticasArtista = await respuestaEstadisticas.json();
@@ -302,7 +302,7 @@ export default function PerfilScreen() {
         }
 
         const respuestaCanciones = await fetch(
-          'http://192.168.1.5:3000/api/canciones/me',
+          'http://192.168.1.13:3000/api/canciones/me',
           {
             method: 'GET',
             headers: {
@@ -347,7 +347,7 @@ export default function PerfilScreen() {
       { ruta: 'guardadas', actualizar: setGuardadas },
     ].map(async ({ ruta, actualizar }) => {
       try {
-        const respuesta = await fetch(`http://192.168.1.5:3000/api/${ruta}/me`, { headers: { Authorization: `Bearer ${token}` } });
+        const respuesta = await fetch(`http://192.168.1.13:3000/api/${ruta}/me`, { headers: { Authorization: `Bearer ${token}` } });
         if (!respuesta.ok) throw new Error('No se pudo cargar ' + ruta);
         const datos = await respuesta.json();
         actualizar((datos.canciones || []).map((item: { id: string }) => item.id));
@@ -367,7 +367,7 @@ export default function PerfilScreen() {
     try {
       const token = await SecureStore.getItemAsync('token');
       if (!token) { Alert.alert('Sesión', 'Inicia sesión para continuar.'); return; }
-      const respuesta = await fetch(`http://192.168.1.5:3000/api/${tipo}/${cancionId}`, {
+      const respuesta = await fetch(`http://192.168.1.13:3000/api/${tipo}/${cancionId}`, {
         method: actuales.includes(cancionId) ? 'DELETE' : 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -488,7 +488,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                 {usuario.fotoPerfil ? (
                   <Image
                     source={{
-                      uri: `http://192.168.1.5:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
+                      uri: `http://192.168.1.13:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
                     }}
                     style={styles.avatarImage}
                     resizeMode="cover"
@@ -824,7 +824,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                           {cancion.portadaId ? (
                             <Image
                               source={{
-                                uri: `http://192.168.1.5:3000/api/canciones/portadas/${cancion.portadaId}`,
+                                uri: `http://192.168.1.13:3000/api/canciones/portadas/${cancion.portadaId}`,
                               }}
                               style={[styles.songCover, anchoPantalla < 1050 && styles.songCoverCompact]}
                               resizeMode="cover"
@@ -832,7 +832,7 @@ const mensaje = `🎤 Conoce mi perfil artístico: ${nombre} (@${usuario.nombreU
                           ) : usuario.fotoPerfil ? (
                             <Image
                               source={{
-                                uri: `http://192.168.1.5:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
+                                uri: `http://192.168.1.13:3000/api/usuarios/foto-perfil/${usuario.fotoPerfil}`,
                               }}
                               style={[styles.songCover, anchoPantalla < 1050 && styles.songCoverCompact]}
                               resizeMode="cover"

@@ -157,7 +157,7 @@ useEffect(() => {
     setRegistrando(true);
 
     const respuesta = await fetch(
-      'http://192.168.1.5:3000/api/usuarios/registro',
+      'http://192.168.1.13:3000/api/usuarios/registro',
       {
         method: 'POST',
         headers: {

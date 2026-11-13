@@ -18,7 +18,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-const API_URL = 'http://192.168.1.5:3000';
+const API_URL = 'http://192.168.1.13:3000';
 
 type FiltroBiblioteca = 'todos' | 'artistas' | 'gustas' | 'guardadas';
 
@@ -258,10 +258,10 @@ export default function BibliotecaScreen() {
       };
 
       void cargarGuardadas();
-      void cargarMeGustas();
-      if (revisionBiblioteca === 0) void cargarArtistas();
-      listasCargadas.current = true;
-      return () => { activo = false; };
+void cargarMeGustas();
+void cargarArtistas();
+listasCargadas.current = true;
+return () => { activo = false; };
     }, [intento, revisionBiblioteca])
   );
 

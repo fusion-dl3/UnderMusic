@@ -36,7 +36,7 @@ export default function HomeScreen() {
           return;
         }
 
-        const respuesta = await fetch('http://192.168.1.5:3000/api/usuarios/me', {
+        const respuesta = await fetch('http://192.168.1.13:3000/api/usuarios/me', {
           method: 'GET',
           headers: { Authorization: `Bearer ${token}`, },
           signal: controlador.signal,

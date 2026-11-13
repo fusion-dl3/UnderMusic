@@ -6,7 +6,7 @@ import { ActivityIndicator, ImageBackground, Modal, Pressable, ScrollView, Style
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePlayer } from '@/context/PlayerContext';
 
-const API = 'http://192.168.1.5:3000/api/usuarios';
+const API = 'http://192.168.1.13:3000/api/usuarios';
 type Panel = 'correo' | 'password' | null;
 type Dialogo = { titulo: string; mensaje: string; accion?: 'logout' } | null;
 export default function ConfiguracionCuenta() {

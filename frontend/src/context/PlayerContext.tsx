@@ -9,12 +9,13 @@ import {
 } from 'react';
 
 import {
+  setAudioModeAsync,
   useAudioPlayer,
   useAudioPlayerStatus,
 } from 'expo-audio';
 import * as SecureStore from 'expo-secure-store';
 
-const API_URL = 'http://192.168.1.5:3000';
+const API_URL = 'http://192.168.1.13:3000';
 const SEGUNDOS_MINIMOS_ESCUCHA = 30;
 
 export type CancionReproductor = {
@@ -155,6 +156,53 @@ export function PlayerProvider({
   });
 
   const status = useAudioPlayerStatus(player);
+
+  useEffect(() => {
+  const configurarAudio = async () => {
+    try {
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
+        interruptionMode: 'doNotMix',
+      });
+
+      console.log(
+        'UNDERMUSIC: audio en segundo plano configurado'
+      );
+    } catch (error) {
+      console.error(
+        'UNDERMUSIC: error al configurar audio',
+        error
+      );
+    }
+  };
+
+  void configurarAudio();
+}, []);
+
+useEffect(() => {
+  if (!cancionActual) {
+    player.clearLockScreenControls();
+    return;
+  }
+
+  const metadata = {
+    title: cancionActual.titulo,
+    artist: cancionActual.nombreArtista,
+    artworkUrl: cancionActual.portadaId
+      ? `${API_URL}/api/canciones/portada/${cancionActual.portadaId}`
+      : undefined,
+  };
+
+  player.setActiveForLockScreen(true, metadata, {
+    showSeekForward: false,
+    showSeekBackward: false,
+  });
+
+  return () => {
+    player.clearLockScreenControls();
+  };
+}, [player, cancionActual]);
 
   // Identifica la reproducción que estamos contabilizando.
 const registrarEscuchaEnBackend = async (

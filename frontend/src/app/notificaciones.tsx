@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const API_URL = 'http://192.168.1.5:3000';
+const API_URL = 'http://192.168.1.13:3000';
 const LIMITE = 30;
 
 type Notificacion = {

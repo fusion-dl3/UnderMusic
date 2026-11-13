@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  BackHandler,
   Image,
   ImageBackground,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -25,6 +28,24 @@ export default function LoginScreen() {
 
   const buttonScale = useRef(new Animated.Value(1)).current;
 
+  useFocusEffect(
+  useCallback(() => {
+    if (Platform.OS !== 'android') return;
+
+    const suscripcion = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (iniciandoSesion) return true;
+
+        router.replace('/');
+        return true;
+      }
+    );
+
+    return () => suscripcion.remove();
+  }, [iniciandoSesion])
+);
+
   const iniciarSesion = async () => {
     setMensajeError('');
     setMensajeExito('');
@@ -38,7 +59,7 @@ export default function LoginScreen() {
       setIniciandoSesion(true);
 
       const respuesta = await fetch(
-        'http://192.168.1.5:3000/api/usuarios/login',
+        'http://192.168.1.13:3000/api/usuarios/login',
         {
           method: 'POST',
           headers: {
@@ -118,7 +139,13 @@ export default function LoginScreen() {
         <View style={styles.darkOverlay} />
 
         <SafeAreaView style={styles.safeArea}>
-          <View style={styles.content}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
             <Image
               source={require('../../assets/images/undermusic-logo.png')}
               style={styles.logo}
@@ -292,10 +319,10 @@ export default function LoginScreen() {
             </View>
 
             <Pressable
-              onPress={() => router.back()}
-              disabled={iniciandoSesion}
-              style={styles.backButton}
-            >
+  onPress={() => router.replace('/')}
+  disabled={iniciandoSesion}
+  style={styles.backButton}
+>
               <Ionicons
                 name="chevron-back"
                 size={19}
@@ -304,7 +331,7 @@ export default function LoginScreen() {
 
               <Text style={styles.backText}>Volver</Text>
             </Pressable>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </ImageBackground>
     </View>
@@ -332,8 +359,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  content: {
+  scrollView: {
     flex: 1,
+  },
+
+  content: {
+    flexGrow: 1,
     width: '100%',
     maxWidth: 560,
     alignSelf: 'center',

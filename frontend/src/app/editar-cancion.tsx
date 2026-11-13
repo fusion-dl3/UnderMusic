@@ -9,7 +9,7 @@ import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GENEROS_MUSICALES, GeneroMusical } from '../constants/generos';
 
-const API = 'http://192.168.1.5:3000/api';
+const API = 'http://192.168.1.13:3000/api';
 const MAX_PORTADA = 5 * 1024 * 1024;
 
 type Cancion = {

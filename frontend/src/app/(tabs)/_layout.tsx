@@ -1,7 +1,9 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Tabs, useFocusEffect, useRouter, useSegments } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { useEffect } from 'react';
+import { Redirect, Tabs, useFocusEffect, useRouter, useSegments } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { BackHandler, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -23,6 +25,32 @@ function IndicadorActivo() {
 export default function TabsLayout() {
   const { noLeidas, actualizarContador } = useNotificaciones();
   const [mostrarConfirmacionSalida, setMostrarConfirmacionSalida] = useState(false);
+  const [sesionValida, setSesionValida] = useState<boolean | null>(null);
+  useFocusEffect(
+  useCallback(() => {
+    let activo = true;
+
+    const comprobarToken = async () => {
+      try {
+        const token = await SecureStore.getItemAsync('token');
+
+        if (activo) {
+          setSesionValida(Boolean(token));
+        }
+      } catch {
+        if (activo) {
+          setSesionValida(false);
+        }
+      }
+    };
+
+    void comprobarToken();
+
+    return () => {
+      activo = false;
+    };
+  }, [])
+);
 
 const router = useRouter();
 const segments = useSegments();
@@ -59,6 +87,14 @@ useFocusEffect(
       void actualizarContador();
     }, [actualizarContador])
   );
+
+  if (sesionValida === null) {
+  return null;
+}
+
+if (!sesionValida) {
+  return <Redirect href="/" />;
+}
 
   return (
     <View style={styles.container}>

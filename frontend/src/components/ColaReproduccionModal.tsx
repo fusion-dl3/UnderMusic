@@ -4,7 +4,7 @@ import { Animated, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePlayer, type CancionReproductor } from '@/context/PlayerContext';
 
-const API_URL = 'http://192.168.1.5:3000';
+const API_URL = 'http://192.168.1.13:3000';
 
 function PortadaCancion({ cancion }: { cancion: CancionReproductor }) {
   const uri = cancion.portadaId

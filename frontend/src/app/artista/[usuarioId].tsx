@@ -39,7 +39,7 @@ import {
 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const API_URL = 'http://192.168.1.5:3000';
+const API_URL = 'http://192.168.1.13:3000';
 
 type ArtistaPublico = {
   usuarioId: string;

@@ -390,7 +390,7 @@ export default function PublicarCancionScreen() {
 
       const respuesta =
         await archivoAudio.upload(
-          'http://192.168.1.5:3000/api/canciones',
+          'http://192.168.1.13:3000/api/canciones',
           {
             httpMethod: 'POST',
             uploadType: UploadType.MULTIPART,
@@ -479,7 +479,7 @@ export default function PublicarCancionScreen() {
 
       const respuestaPortada =
         await portada.upload(
-          `http://192.168.1.5:3000/api/canciones/${cancionId}/portada`,
+          `http://192.168.1.13:3000/api/canciones/${cancionId}/portada`,
           {
             httpMethod: 'PATCH',
             uploadType: UploadType.MULTIPART,

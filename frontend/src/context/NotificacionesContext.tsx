@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 
-const API_URL = 'http://192.168.1.5:3000';
+const API_URL = 'http://192.168.1.13:3000';
 
 type NotificacionesContextType = {
   noLeidas: number;
